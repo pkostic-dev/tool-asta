@@ -131,7 +131,6 @@ class SkeletonConverter:
 		# load data of every id 
 		for n in range(0,len(data.skeletons)):
 			# verifie if this id was detected before
-			print(data.skeletons[n][1:])
 			
 			if data.skeletons[n].user_id in self.id:
 				# if id was detected before, we copy the joint's previous
@@ -140,10 +139,10 @@ class SkeletonConverter:
 				# Then Overwrite the original data of joints with the new state 
 				i = self.id.index(data.skeletons[n].user_id)
 
-				for j in range(0,25):
+				for j in range(0,20):
 					self.translation[i,j,:] = \
 						(-np.array(self.joints[i][j].real)/1000.0).tolist()
-					self.rotation[i,j,:] = self.joints[i][j].orientation
+					self.rotation[i,j,:] = self.joints[i][j].orientation.flatten()
 				self.joints[i] = data.skeletons[n][1:]
 			else:
 				# if not, we will add now id and save data in the joints list,
@@ -151,10 +150,10 @@ class SkeletonConverter:
 				self.id.append(data.skeletons[n].user_id)
 				i = len(self.id)-1
 				self.joints.append(data.skeletons[n][1:])
-				for j in range(0,25):
+				for j in range(0,20):
 					self.translation[i,j,:] = \
 						(-np.array(self.joints[i][j].real)/1000.0).tolist()
-					self.rotation[i,j,:] = self.joints[i][j].orientation
+					self.rotation[i,j,:] = self.joints[i][j].orientation.flatten()
 		self.do()
 
 
@@ -195,11 +194,19 @@ class SkeletonConverter:
 		for (k,j) in zip(joints_number, range(len(joint_name))):
 			translation = self.translation[i,k,:]
 			rotation = tf.transformations.quaternion_from_euler(
-				rot_euler[j,0],rot_euler[j,1],rot_euler[j,2])
+				rot_euler[j,0],
+				rot_euler[j,1],
+				rot_euler[j,2])
 			time = rospy.Time.now()
 			child = joint_name[j]+"_"+str(i)
 			parent = "/nuitrack_frame"
-			self.br.sendTransform(translation, rotation, time, child, parent)
+
+			self.transform_broadcaster.sendTransform(
+				translation,
+				rotation,
+				time,
+				child,
+				parent)
 
 
 if __name__ == '__main__':
@@ -208,4 +215,7 @@ if __name__ == '__main__':
 
 	SC = SkeletonConverter()
 	SC.init_nuitrack()
+
+	rospy.init_node("tf_skeletons",anonymous=True)
+
 	SC.update()
