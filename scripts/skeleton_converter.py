@@ -173,6 +173,7 @@ class SkeletonConverter:
 			i(int): The id of detected person
 		"""
 
+		# TODO : check if joint list and number list correct
 		# name every joint
 		joint_name = ["Head","Neck","Torso","Waist","Left_Collar",
 			"Left_Shoulder","Left_Elbow","Left_Wrist","Left_Hand",
