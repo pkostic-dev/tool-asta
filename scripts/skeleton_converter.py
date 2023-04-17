@@ -28,16 +28,16 @@ class SkeletonConverter:
 		logging.info("Initialising tf.TransformBroadcaster object.")
 		self.transform_broadcaster = tf.TransformBroadcaster()
 
-		# The ids of perced objects
-		self.id = []
-		# The joints list of skeleton. The length will be 25. Because Nuitrack
-		# describe skeleton with 25 joints. Every joint item has information of
-		# translation and rotation
+		# The ids of percieved skeletons
+		self.ids = []
+		# List containing joints of each skeleton. The length will be 20.
+		# Because Nuitrack describe skeleton with 20 joints. Every joint item
+		# has information of translation and rotation
 		self.joints = []
-		# The translations of every joint in space
-		self.translation = np.zeros([10,25,3])
-		# The rotation of every joint in space
-		self.rotation = np.zeros([10,25,9])
+		# The translations of every joint in space [id, joint, xyz]
+		self.translation = np.zeros([10, 25, 3])
+		# The rotation of every joint in space [id, joint, matrix]
+		self.rotation = np.zeros([10, 25, 9])
 
 
 	def init_nuitrack(self) -> None:
@@ -90,33 +90,12 @@ class SkeletonConverter:
 		self.nuitrack.release()
 
 
-	def convert(self, data):
-		"""Converts nuitrack skeleton data to qt skeleton data format"""
-		
-		skeletons = []
-		for skelly in data.skeletons:
-			id = skelly.user_id
-			joints = skelly[1:]
-			new_skelly = {
-				"id" : id,
-				"joints" : joints	
-			}
-			skeletons.append(new_skelly)
-		data = {
-			"skeletons" : skeletons
-		}
-		return data
-
-
 	def update(self):
 		"""Continuously update Nuitrack, get, convert, and load skeleton data."""
 
 		while not rospy.is_shutdown():
 			self.nuitrack.update()
-			data = self.convert(self.nuitrack.get_skeleton())
 			data = self.nuitrack.get_skeleton()
-			print(data)
-			# NOTE : From this point forward, black box.
 			self.load(data)
 
 	
@@ -129,31 +108,36 @@ class SkeletonConverter:
 		"""
 
 		# load data of every id 
-		for n in range(0,len(data.skeletons)):
-			# verifie if this id was detected before
+		for skeleton in range(0,len(data.skeletons)):
+			# verify if this id was detected before
 			
-			if data.skeletons[n].user_id in self.id:
+			if data.skeletons[skeleton].user_id in self.ids:
 				# if id was detected before, we copy the joint's previous
 				# translation and rotation to the translation list and rotation
 				# list.
 				# Then Overwrite the original data of joints with the new state 
-				i = self.id.index(data.skeletons[n].user_id)
+				id = self.ids.index(data.skeletons[skeleton].user_id)
 
-				for j in range(0,20):
-					self.translation[i,j,:] = \
-						(-np.array(self.joints[i][j].real)/1000.0).tolist()
-					self.rotation[i,j,:] = self.joints[i][j].orientation.flatten()
-				self.joints[i] = data.skeletons[n][1:]
+				for joint in range(0,20):
+					# NOTE : find out why divided by 1000.0 and why negative ?
+					self.translation[id,joint,:] = \
+						(-np.array(self.joints[id][joint].real)/1000.0).tolist() 
+					self.rotation[id,joint,:] = \
+						self.joints[id][joint].orientation.flatten()
+				
+				self.joints[id] = data.skeletons[skeleton][1:]
 			else:
 				# if not, we will add now id and save data in the joints list,
 				# translation list and rotation list
-				self.id.append(data.skeletons[n].user_id)
-				i = len(self.id)-1
-				self.joints.append(data.skeletons[n][1:])
-				for j in range(0,20):
-					self.translation[i,j,:] = \
-						(-np.array(self.joints[i][j].real)/1000.0).tolist()
-					self.rotation[i,j,:] = self.joints[i][j].orientation.flatten()
+				self.ids.append(data.skeletons[skeleton].user_id)
+				id = len(self.ids)-1
+				self.joints.append(data.skeletons[skeleton][1:])
+
+				for joint in range(0,20):
+					self.translation[id,joint,:] = \
+						(-np.array(self.joints[id][joint].real)/1000.0).tolist() 
+					self.rotation[id,joint,:] = \
+						self.joints[id][joint].orientation.flatten()
 		self.do()
 
 
@@ -162,44 +146,47 @@ class SkeletonConverter:
 		Function to send all ids' TFs
 		"""
 
-		for i in self.id:
-			self.handle_tf(self.id.index(i))
+		for id in self.ids:
+			self.handle_tf(self.ids.index(id))
 
 
-	def handle_tf(self,i):
+	def handle_tf(self,id):
 		"""
 		Function send Transform information of every point of skeletons
 		Args:
-			i(int): The id of detected person
+			id(int): The id of detected person
 		"""
 
-		# TODO : check if joint list and number list correct
-		# name every joint
-		joint_name = ["Head","Neck","Torso","Waist","Left_Collar",
+		# Name every joint
+		joint_names = ["Head","Neck","Torso","Waist","Left_Collar",
 			"Left_Shoulder","Left_Elbow","Left_Wrist","Left_Hand",
 			"Right_Collar","Right_Shoulder","Right_Elbow","Right_Wrist",
 			"Right_Hand","Left_Hip","Left_Knee","Left_Ankle","Right_Hip",
 			"Right_Knee","Right_Ankle"]
-		# there a 3 joints don't have data, so we use just 23 joints here.
-		joints_number = [1,2,3,4,5,6,7,8,9,11,12,13,14,15,17,18,19,21,22,23]
+		# NOTE : why were there 20/25 joints
+		joints_numbers = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
 
-		# calculate the rotation in Euler angles.
-		rot_euler = np.zeros([20,3])
-		for (j,n) in zip(joints_number,range(20)): 
-			r = self.rotation[i,j,:]
-			m = np.mat([[r[0],r[1],r[2]],[r[3],r[4],r[5]],[r[6],r[7],r[8]]])
-			rot = tf.transformations.euler_from_matrix(m,"rxyz")
-			rot_euler[n,:] = rot
+		# Calculate the rotation in Euler angles. [joint, xyz]
+		euler_rotations = np.zeros([20,3])
+		for (joint,n) in zip(joints_numbers,range(20)): 
+			r = self.rotation[id,joint,:]
+			m = np.mat([
+				[r[0], r[1], r[2]],
+				[r[3], r[4], r[5]],
+				[r[6], r[7], r[8]]
+			])
+			euler_rotation = tf.transformations.euler_from_matrix(m,"rxyz")
+			euler_rotations[n,:] = euler_rotation
 		
 		# send transform message
-		for (k,j) in zip(joints_number, range(len(joint_name))):
-			translation = self.translation[i,k,:]
+		for (joint, joint_name) in zip(joints_numbers, range(len(joint_names))):
+			translation = self.translation[id,joint,:]
 			rotation = tf.transformations.quaternion_from_euler(
-				rot_euler[j,0],
-				rot_euler[j,1],
-				rot_euler[j,2])
+				euler_rotations[joint_name, 0],
+				euler_rotations[joint_name, 1],
+				euler_rotations[joint_name, 2])
 			time = rospy.Time.now()
-			child = joint_name[j]+"_"+str(i)
+			child = joint_names[joint_name]+"_"+str(id)
 			parent = "/nuitrack_frame"
 
 			self.transform_broadcaster.sendTransform(
