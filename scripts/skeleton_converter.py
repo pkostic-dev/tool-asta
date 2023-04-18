@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import rospy
 import tf
 from PyNuitrack import py_nuitrack
@@ -7,17 +8,18 @@ import logging
 
 
 class SkeletonConverter:
-	"""Converts nuitrack skeleton data into tf data and publishes it.
+	"""Converts Nuitrack skeleton data into TF data and publishes it.
 
-	This class creates initialises a Nuitrack object. Converts the data from it
+	This class initialises a Nuitrack object. Converts the data obtained from it
 	into TF skeleton data. And publishes the TF skeleton data to ROS with a
 	TransformBroadcaster object.
 	"""
 
-	def __init__(self):
-		"""
+	def __init__(self) -> None:
+		"""Initialises other objects and creates class member variables
+
 		Initialisation of class, creates Nuitrack and TransformBroadcaster
-		objects.
+		objects. As well as all the class member variables.
 		"""
 
 		super().__init__()
@@ -30,22 +32,23 @@ class SkeletonConverter:
 
 		# The ids of percieved skeletons
 		self.ids = []
-		# List containing joints of each skeleton. The length will be 20.
-		# Because Nuitrack describe skeleton with 20 joints. Every joint item
-		# has information of translation and rotation
+		# List containing joints of each skeleton
+		# There is a total of 20 joints per skeleton
 		self.joints = []
-		# The translations of every joint in space [id, joint, xyz]
+		# The translations of every joint in space
+		# [ids, joints, xyz_coordinates]
 		self.translation = np.zeros([10, 25, 3])
-		# The rotation of every joint in space [id, joint, matrix]
+		# The rotation of every joint in space
+		# [ids, joints, 3x3_matrices]
 		self.rotation = np.zeros([10, 25, 9])
 
 
 	def init_nuitrack(self) -> None:
 		"""Initialises a Nuitrack object.
 		
-		This method initialises a Nuitrack object. It searches for a Nuitrack
-		compatible device and selects the first one. It checks the activation
-		status of the license. Finally it runs the Nuitrack object.
+		Initialises a Nuitrack object. Searches for a Nuitrack compatible device
+		and selects the first one. Checks the activation status of the license.
+		Finally the Nuitrack object is run.
 		"""
 		
 		logging.info("Initialising py_nuitrack.Nuitrack object.")
@@ -86,31 +89,31 @@ class SkeletonConverter:
 
 
 	def shutdown_hook(self):
+		"""Shutdown hook for the Nuitrack object."""
+
 		logging.info("Shutting down nuitrack.")
-		self.nuitrack.release()
+		if self.nuitrack != None:
+			self.nuitrack.release()
 
 
 	def update(self):
-		"""Continuously update Nuitrack, get, convert, and load skeleton data."""
+		"""Continuously update Nuitrack, get skeleton data, and load it."""
 
 		while not rospy.is_shutdown():
 			self.nuitrack.update()
 			data = self.nuitrack.get_skeleton()
-			self.load(data)
+			# if data.skeletons != []:
+			# 	print(data.skeletons[0][1].type)
+			self.store_skeletons(data)
+			self.do()
 
 	
-	def load(self,data):
-		"""
-		Function for load data heard from nuitrack	
-
-		Args:
-		data: The data heard from nuitrack
-		"""
+	def store_skeletons(self, data):
+		"""Load skeleton data heard from Nuitrack."""
 
 		# load data of every id 
 		for skeleton in range(0,len(data.skeletons)):
 			# verify if this id was detected before
-			
 			if data.skeletons[skeleton].user_id in self.ids:
 				# if id was detected before, we copy the joint's previous
 				# translation and rotation to the translation list and rotation
@@ -118,12 +121,7 @@ class SkeletonConverter:
 				# Then Overwrite the original data of joints with the new state 
 				id = self.ids.index(data.skeletons[skeleton].user_id)
 
-				for joint in range(0,20):
-					# NOTE : find out why divided by 1000.0 and why negative ?
-					self.translation[id,joint,:] = \
-						(-np.array(self.joints[id][joint].real)/1000.0).tolist() 
-					self.rotation[id,joint,:] = \
-						self.joints[id][joint].orientation.flatten()
+				self.store_joints(id)
 				
 				self.joints[id] = data.skeletons[skeleton][1:]
 			else:
@@ -133,60 +131,50 @@ class SkeletonConverter:
 				id = len(self.ids)-1
 				self.joints.append(data.skeletons[skeleton][1:])
 
-				for joint in range(0,20):
-					self.translation[id,joint,:] = \
-						(-np.array(self.joints[id][joint].real)/1000.0).tolist() 
-					self.rotation[id,joint,:] = \
-						self.joints[id][joint].orientation.flatten()
-		self.do()
+				self.store_joints(id)
+
+
+	def store_joints(self, id):
+		for joint in range(0,20):
+			# NOTE : find out why divided by 1000.0 and why negative ?
+			self.translation[id,joint,:] = \
+				(-np.array(self.joints[id][joint].real)/1000.0).tolist() 
+			self.rotation[id,joint,:] = \
+				self.joints[id][joint].orientation.flatten()
 
 
 	def do(self):
-		"""
-		Function to send all ids' TFs
-		"""
+		"""Function to send all ids' TFs."""
 
 		for id in self.ids:
 			self.handle_tf(self.ids.index(id))
 
 
-	def handle_tf(self,id):
-		"""
-		Function send Transform information of every point of skeletons
-		Args:
-			id(int): The id of detected person
-		"""
-
-		# Name every joint
-		joint_names = ["Head","Neck","Torso","Waist","Left_Collar",
-			"Left_Shoulder","Left_Elbow","Left_Wrist","Left_Hand",
-			"Right_Collar","Right_Shoulder","Right_Elbow","Right_Wrist",
-			"Right_Hand","Left_Hip","Left_Knee","Left_Ankle","Right_Hip",
-			"Right_Knee","Right_Ankle"]
-		# NOTE : why were there 20/25 joints
-		joints_numbers = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+	def handle_tf(self, id):
+		"""Function send Transform information of every point of skeletons"""
 
 		# Calculate the rotation in Euler angles. [joint, xyz]
-		euler_rotations = np.zeros([20,3])
-		for (joint,n) in zip(joints_numbers,range(20)): 
-			r = self.rotation[id,joint,:]
+		euler_rotations = np.zeros([20, 3])
+
+		for joint_number in range(20): 
+			r = self.rotation[id, joint_number, :]
 			m = np.mat([
 				[r[0], r[1], r[2]],
 				[r[3], r[4], r[5]],
 				[r[6], r[7], r[8]]
 			])
-			euler_rotation = tf.transformations.euler_from_matrix(m,"rxyz")
-			euler_rotations[n,:] = euler_rotation
+			euler_rotation = tf.transformations.euler_from_matrix(m, "rxyz")
+			euler_rotations[joint_number, :] = euler_rotation
 		
 		# send transform message
-		for (joint, joint_name) in zip(joints_numbers, range(len(joint_names))):
-			translation = self.translation[id,joint,:]
+		for joint_number in range(20):
+			translation = self.translation[id,joint_number, :]
 			rotation = tf.transformations.quaternion_from_euler(
-				euler_rotations[joint_name, 0],
-				euler_rotations[joint_name, 1],
-				euler_rotations[joint_name, 2])
+				euler_rotations[joint_number, 0],
+				euler_rotations[joint_number, 1],
+				euler_rotations[joint_number, 2])
 			time = rospy.Time.now()
-			child = joint_names[joint_name]+"_"+str(id)
+			child = str(self.joints[id][joint_number].type)+"_"+str(id)
 			parent = "/nuitrack_frame"
 
 			self.transform_broadcaster.sendTransform(
@@ -197,13 +185,17 @@ class SkeletonConverter:
 				parent)
 
 
+	def launch(self):
+		self.init_nuitrack()
+
+		rospy.init_node("tf_skeletons",anonymous=True)
+
+		self.update()
+
+
 if __name__ == '__main__':
 	# Configure logging module
 	logging.basicConfig(level=logging.DEBUG)
 
 	SC = SkeletonConverter()
-	SC.init_nuitrack()
-
-	rospy.init_node("tf_skeletons",anonymous=True)
-
-	SC.update()
+	SC.launch()
