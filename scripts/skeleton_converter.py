@@ -88,7 +88,7 @@ class SkeletonConverter:
 		rospy.on_shutdown(self.shutdown_hook)
 
 
-	def shutdown_hook(self):
+	def shutdown_hook(self) -> None:
 		"""Shutdown hook for the Nuitrack object."""
 
 		logging.info("Shutting down nuitrack.")
@@ -96,19 +96,26 @@ class SkeletonConverter:
 			self.nuitrack.release()
 
 
-	def update(self):
+	def update(self) -> None:
 		"""Continuously update Nuitrack, get skeleton data, and load it."""
 
 		while not rospy.is_shutdown():
-			self.nuitrack.update()
-			data = self.nuitrack.get_skeleton()
-			# if data.skeletons != []:
-			# 	print(data.skeletons[0][1].type)
-			self.store_skeletons(data)
-			self.do()
+			try:
+				self.nuitrack.update()
+				data = self.nuitrack.get_skeleton()
+				# if data.skeletons != []:
+				# 	print(data.skeletons[0][1].type)
+				self.store_skeletons(data)
+				self.do()
+			except KeyboardInterrupt:
+				logging.info("Shutting down nuitrack.")
+				if self.nuitrack != None:
+					self.nuitrack.release()
+				rospy.signal_shutdown("KeyboardInterrupt")
+				raise SystemExit
 
 	
-	def store_skeletons(self, data):
+	def store_skeletons(self, data) -> None:
 		"""Load skeleton data heard from Nuitrack."""
 
 		# load data of every id 
@@ -134,23 +141,23 @@ class SkeletonConverter:
 				self.store_joints(id)
 
 
-	def store_joints(self, id):
+	def store_joints(self, id) -> None:
 		for joint in range(0,20):
-			# NOTE : find out why divided by 1000.0 and why negative ?
+			# NOTE : find out why the array way negative ?
 			self.translation[id,joint,:] = \
-				(-np.array(self.joints[id][joint].real)/1000.0).tolist() 
+				(np.array(self.joints[id][joint].real)/1000.0).tolist() 
 			self.rotation[id,joint,:] = \
 				self.joints[id][joint].orientation.flatten()
 
 
-	def do(self):
+	def do(self) -> None:
 		"""Function to send all ids' TFs."""
 
 		for id in self.ids:
 			self.handle_tf(self.ids.index(id))
 
 
-	def handle_tf(self, id):
+	def handle_tf(self, id) -> None:
 		"""Function send Transform information of every point of skeletons"""
 
 		# Calculate the rotation in Euler angles. [joint, xyz]
@@ -185,11 +192,11 @@ class SkeletonConverter:
 				parent)
 
 
-	def launch(self):
+	def launch(self) -> None:
+		"""Launches the nuitrack, ros node and starts updating."""
+
 		self.init_nuitrack()
-
 		rospy.init_node("tf_skeletons",anonymous=True)
-
 		self.update()
 
 
