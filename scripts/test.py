@@ -60,3 +60,9 @@ euler_rotation = tf.transformations.euler_from_matrix(matrix,"rxyz")
 
 print("matrix =", matrix)
 print("rotation =", euler_rotation)
+
+euler_rotations = np.zeros([20, 3])
+euler_rotations[0, :] = euler_rotation
+
+print(type(euler_rotations))
+print(euler_rotations[0, 0])
