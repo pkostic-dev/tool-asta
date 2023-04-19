@@ -103,8 +103,6 @@ class SkeletonConverter:
 			try:
 				self.nuitrack.update()
 				data = self.nuitrack.get_skeleton()
-				# if data.skeletons != []:
-				# 	print(data.skeletons[0][1].type)
 				self.store_skeletons(data)
 				self.do()
 			except KeyboardInterrupt:
