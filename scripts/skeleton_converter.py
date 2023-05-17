@@ -12,7 +12,8 @@ class SkeletonConverter:
 
 	This class initialises a Nuitrack object. Converts the data obtained from it
 	into TF skeleton data. And publishes the TF skeleton data to ROS with a
-	TransformBroadcaster object.
+	TransformBroadcaster object. This class is a mix of an Adapter pattern class
+	and	a publisher class.
 	"""
 
 	def __init__(self) -> None:
