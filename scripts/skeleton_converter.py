@@ -172,7 +172,16 @@ class SkeletonConverter:
 			euler_rotation = tf.transformations.euler_from_matrix(m, "rxyz")
 			euler_rotations[joint_number, :] = euler_rotation
 		
-		# send transform message
+		# Send /nuitrack_frame info
+		self.transform_broadcaster.sendTransform(
+			(0,0,0),
+			tf.transformations.quaternion_from_euler(0, 0, 0),
+			rospy.Time.now(),
+			"nuitrack_frame",
+			"map"
+		)
+
+		# Send transform message for each joint
 		for joint_number in range(20):
 			translation = self.translation[id,joint_number, :]
 			rotation = tf.transformations.quaternion_from_euler(
