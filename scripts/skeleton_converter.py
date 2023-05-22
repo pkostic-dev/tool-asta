@@ -5,6 +5,7 @@ import tf
 from PyNuitrack import py_nuitrack
 import numpy as np
 import logging
+import math
 
 
 class SkeletonConverter:
@@ -173,9 +174,26 @@ class SkeletonConverter:
 			euler_rotations[joint_number, :] = euler_rotation
 		
 		# Send /nuitrack_frame info
+		position_nuitrack = (0,0,1) # unité
+		# Convert the Euler angles to radians
+		roll = 90.0
+		pitch = 0.0
+		yaw = 0.0
+		roll_rad = math.radians(roll)
+		pitch_rad = math.radians(pitch)
+		yaw_rad = math.radians(yaw)
+
+		# Convert the Euler angles to a quaternion
+		rotation_nuitrack = tf.transformations.quaternion_from_euler(
+			roll_rad,
+			pitch_rad,
+			yaw_rad,
+			axes='sxyz'
+		)
+		
 		self.transform_broadcaster.sendTransform(
-			(0,0,0),
-			tf.transformations.quaternion_from_euler(0, 0, 0),
+			position_nuitrack,
+			rotation_nuitrack,
 			rospy.Time.now(),
 			"nuitrack_frame",
 			"map"
