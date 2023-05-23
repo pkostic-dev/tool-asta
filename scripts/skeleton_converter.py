@@ -174,7 +174,7 @@ class SkeletonConverter:
 			euler_rotations[joint_number, :] = euler_rotation
 		
 		# Send /nuitrack_frame info
-		position_nuitrack = (0,0,1) # unité
+		position_nuitrack = (0, 0, 1) # unité ?
 		# Convert the Euler angles to radians
 		roll = 90.0
 		pitch = 0.0
