@@ -6,6 +6,7 @@ from PyNuitrack import py_nuitrack
 import numpy as np
 import logging
 import math
+from std_msgs.msg import String
 
 
 class SkeletonConverter:
@@ -31,15 +32,24 @@ class SkeletonConverter:
 		# TransformBroadcaster initialisation
 		logging.info("Initialising tf.TransformBroadcaster object.")
 		self.transform_broadcaster = tf.TransformBroadcaster()
+		# Publishes when a human appears/disappears
+		self.presence_publisher = rospy.Publisher(
+			'human_presence',
+			String,
+			queue_size=10
+		)
 
 		# The ids of percieved skeletons
 		self.ids = []
+		# Presence flags
+		self.present_ids = np.zeros(10, dtype=bool)
 		# List containing joints of each skeleton
 		# There is a total of 20 joints per skeleton
 		self.joints = []
 		# The translations of every joint in space
 		# [ids, joints, xyz_coordinates]
 		self.translation = np.zeros([10, 25, 3])
+		self.sent_translation = np.zeros([10, 25, 3])
 		# The rotation of every joint in space
 		# [ids, joints, 3x3_matrices]
 		self.rotation = np.zeros([10, 25, 9])
@@ -183,7 +193,7 @@ class SkeletonConverter:
 		pitch_rad = math.radians(pitch)
 		yaw_rad = math.radians(yaw)
 
-		# Convert the Euler angles to a quaternion
+		# Convert the 3 Euler angles to a quaternion
 		rotation_nuitrack = tf.transformations.quaternion_from_euler(
 			roll_rad,
 			pitch_rad,
@@ -199,6 +209,7 @@ class SkeletonConverter:
 			"map"
 		)
 
+		joints_moving = np.ones(20, dtype=bool)
 		# Send transform message for each joint
 		for joint_number in range(20):
 			translation = self.translation[id,joint_number, :]
@@ -210,19 +221,34 @@ class SkeletonConverter:
 			child = str(self.joints[id][joint_number].type)+"_"+str(id)
 			parent = "/nuitrack_frame"
 
-			self.transform_broadcaster.sendTransform(
-				translation,
-				rotation,
-				time,
-				child,
-				parent)
+			if not (translation == self.sent_translation[id, joint_number, :]).all():
+				if self.present_ids[id] == False:
+					self.present_ids[id] = True
+					self.presence_publisher.publish("human_%d appeared" % id)
+					print("human_%d appeared" % id)
+				self.transform_broadcaster.sendTransform(
+					translation,
+					rotation,
+					time,
+					child,
+					parent)
+			else:
+				joints_moving[joint_number] = False
+			
+			self.sent_translation[id, joint_number, :] = translation
+		
+		if np.all(joints_moving == False):
+			if self.present_ids[id] == True:
+				self.present_ids[id] = False
+				self.presence_publisher.publish("human_%d disappeared" % id)
+				print("human_%d disappeared" % id)
 
 
 	def launch(self) -> None:
 		"""Launches the nuitrack, ros node and starts updating."""
 
 		self.init_nuitrack()
-		rospy.init_node("tf_skeletons",anonymous=True)
+		rospy.init_node("tf_skeletons", anonymous=True)
 		self.update()
 
 
