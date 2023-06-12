@@ -155,7 +155,7 @@ class SkeletonConverter:
 		for joint in range(0,20):
 			# NOTE : find out why the array way negative ?
 			self.translation[id,joint,:] = \
-				(-np.array(self.joints[id][joint].real)/1000.0).tolist() 
+				(np.array(self.joints[id][joint].real)/1000.0).tolist() 
 			self.rotation[id,joint,:] = \
 				self.joints[id][joint].orientation.flatten()
 
