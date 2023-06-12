@@ -111,18 +111,15 @@ class SkeletonConverter:
 	def update(self) -> None:
 		"""Continuously update Nuitrack, get skeleton data, and load it."""
 
-		while not rospy.is_shutdown():
-			try:
+		try:
+			while not rospy.is_shutdown():
 				self.nuitrack.update()
 				data = self.nuitrack.get_skeleton()
 				self.store_skeletons(data)
 				self.do()
-			except KeyboardInterrupt:
-				logging.info("Shutting down nuitrack.")
-				if self.nuitrack != None:
-					self.nuitrack.release()
-				rospy.signal_shutdown("KeyboardInterrupt")
-				raise SystemExit
+		except KeyboardInterrupt:
+			rospy.signal_shutdown("KeyboardInterrupt")
+			raise SystemExit
 
 	
 	def store_skeletons(self, data) -> None:
