@@ -220,52 +220,10 @@ class SkeletonConverter:
 			time = rospy.Time.now()
 			child = str(self.joints[id][joint_number].type)+"_"+str(id)
 			parent = "/nuitrack_frame"
-			
-			#print(translation[0])
-
-			# Triggers based on depth and lateral position
-			# z => profondeur ; x => lateral
-			# if torso
-			if (child == "torso_%d" % id):
-				_msg = ""
-				_x = translation[0]
-				_z = translation[2]
-				
-				# if (_z > 2):
-				# 	_msg = "human_%d_2meters" % id
-				# elif (_z > 1):
-				# 	_msg = "human_%d_1meter" % id
-
-				# if (_x > -0.1 and _x < 0.1):
-				# 	_msg = "human_%d_center" % id
-				# elif (_x < -0.5):
-				# 	_msg = "human_%d_left" % id
-				# elif (_x > 0.5):
-				# 	_msg = "human_%d_right" % id
-
-				if (_x > -0.5 and _x < 0.5):
-					_msg = "human_%d_center" % id
-				elif (_x < -0.5):
-					_msg = "human_%d_left" % id
-				elif (_x > 0.5):
-					_msg = "human_%d_right" % id
-				
-				if (_z > 2):
-					_msg += "_2m"
-				elif (_z > 1):
-					_msg += "_1m"
-
-				if _msg:
-					pass
-					self.presence_publisher.publish(_msg)
-					print(_msg)
-					print("\t", _x, _z)
 
 			if not (translation == self.sent_translation[id, joint_number, :]).all():
 				if self.present_ids[id] == False:
 					self.present_ids[id] = True
-					#self.presence_publisher.publish("human_%d_appeared" % id)
-					#print("human_%d_appeared" % id)
 				self.transform_broadcaster.sendTransform(
 					translation,
 					rotation,
@@ -280,8 +238,6 @@ class SkeletonConverter:
 		if np.all(joints_moving == False):
 			if self.present_ids[id] == True:
 				self.present_ids[id] = False
-				#self.presence_publisher.publish("human_%d_disappeared" % id)
-				#print("human_%d_disappeared" % id)
 
 
 	def launch(self) -> None:
