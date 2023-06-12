@@ -32,12 +32,6 @@ class SkeletonConverter:
 		# TransformBroadcaster initialisation
 		logging.info("Initialising tf.TransformBroadcaster object.")
 		self.transform_broadcaster = tf.TransformBroadcaster()
-		# Publishes when a human appears/disappears
-		self.presence_publisher = rospy.Publisher(
-			'human_presence',
-			String,
-			queue_size=1
-		)
 
 		# The ids of percieved skeletons
 		self.ids = []
@@ -53,6 +47,13 @@ class SkeletonConverter:
 		# The rotation of every joint in space
 		# [ids, joints, 3x3_matrices]
 		self.rotation = np.zeros([10, 25, 9])
+
+		self.init_nuitrack()
+
+		rospy.init_node("tf_skeletons", anonymous=True)
+
+		update_frequency = 1.0 # in Hz
+		self.rospy_rate = rospy.Rate(update_frequency)
 
 
 	def init_nuitrack(self) -> None:
@@ -108,7 +109,7 @@ class SkeletonConverter:
 			self.nuitrack.release()
 
 
-	def update(self) -> None:
+	def launch(self) -> None:
 		"""Continuously update Nuitrack, get skeleton data, and load it."""
 
 		try:
@@ -116,27 +117,23 @@ class SkeletonConverter:
 				self.nuitrack.update()
 				data = self.nuitrack.get_skeleton()
 				self.store_skeletons(data)
-				self.do()
+				self.broadcast_skeletons()
+				self.rospy_rate.sleep()
 		except KeyboardInterrupt:
 			rospy.signal_shutdown("KeyboardInterrupt")
 			raise SystemExit
 
 	
 	def store_skeletons(self, data) -> None:
-		"""Load skeleton data heard from Nuitrack."""
+		"""Store the skeletons data from Nuitrack."""
 
-		# load data of every id 
+		# Loop through all skeletons found
 		for skeleton in range(0,len(data.skeletons)):
-			# verify if this id was detected before
+			# Verify if the detected skeleton's user_id has already been stored
 			if data.skeletons[skeleton].user_id in self.ids:
-				# if id was detected before, we copy the joint's previous
-				# translation and rotation to the translation list and rotation
-				# list.
-				# Then Overwrite the original data of joints with the new state 
+				# If the skeleton has been detected then overwrite its joints data
 				id = self.ids.index(data.skeletons[skeleton].user_id)
-
 				self.store_joints(id)
-				
 				self.joints[id] = data.skeletons[skeleton][1:]
 			else:
 				# if not, we will add now id and save data in the joints list,
@@ -145,52 +142,87 @@ class SkeletonConverter:
 				id = len(self.ids)-1
 				self.joints.append(data.skeletons[skeleton][1:])
 
-				self.store_joints(id)
-
 
 	def store_joints(self, id) -> None:
 		for joint in range(0,20):
-			# NOTE : find out why the array way negative ?
 			self.translation[id,joint,:] = \
-				(np.array(self.joints[id][joint].real)/1000.0).tolist() 
+				(-np.array(self.joints[id][joint].real)/1000.0).tolist() 
 			self.rotation[id,joint,:] = \
 				self.joints[id][joint].orientation.flatten()
 
 
-	def do(self) -> None:
-		"""Function to send all ids' TFs."""
-
-		for id in self.ids:
-			self.handle_tf(self.ids.index(id))
-
-
-	def handle_tf(self, id) -> None:
+	def broadcast_skeletons(self) -> None:
 		"""Function send Transform information of every point of skeletons"""
 
-		# Calculate the rotation in Euler angles. [joint, xyz]
-		euler_rotations = np.zeros([20, 3])
+		for skeleton_id in self.ids:
+			id = self.ids.index(skeleton_id)
 
-		for joint_number in range(20): 
-			r = self.rotation[id, joint_number, :]
-			m = np.mat([
-				[r[0], r[1], r[2]],
-				[r[3], r[4], r[5]],
-				[r[6], r[7], r[8]]
-			])
-			euler_rotation = tf.transformations.euler_from_matrix(m, "rxyz")
-			euler_rotations[joint_number, :] = euler_rotation
+			# Calculate the rotation in Euler angles. [joint, xyz]
+			euler_rotations = np.zeros([20, 3])
+
+			for joint_number in range(20): 
+				r = self.rotation[id, joint_number, :]
+				m = np.mat([
+					[r[0], r[1], r[2]],
+					[r[3], r[4], r[5]],
+					[r[6], r[7], r[8]]
+				])
+				euler_rotation = tf.transformations.euler_from_matrix(m, "rxyz")
+				euler_rotations[joint_number, :] = euler_rotation
+			
+			# Broadcast /nuitrack_frame position and rotation
+			self.broadcast_nuitrack_frame()
+
+			joints_moving = np.ones(20, dtype=bool)
+			# Send transform message for each joint
+			for joint_number in range(20):
+				translation = self.translation[id,joint_number, :]
+				rotation = tf.transformations.quaternion_from_euler(
+					euler_rotations[joint_number, 0],
+					euler_rotations[joint_number, 1],
+					euler_rotations[joint_number, 2])
+				time = rospy.Time.now()
+				child = str(self.joints[id][joint_number].type)+"_"+str(id)
+				parent = "/nuitrack_frame"
+
+				if not (translation == self.sent_translation[id, joint_number, :]).all():
+					if self.present_ids[id] == False:
+						self.present_ids[id] = True
+					self.transform_broadcaster.sendTransform(
+						translation,
+						rotation,
+						time,
+						child,
+						parent)
+				else:
+					joints_moving[joint_number] = False
+				
+				self.sent_translation[id, joint_number, :] = translation
+			
+			if np.all(joints_moving == False):
+				if self.present_ids[id] == True:
+					self.present_ids[id] = False
+
+
+	def broadcast_nuitrack_frame(self) -> None:
+		"""Broadcasts nuitrack frame (camera position, manual configuration)."""
 		
-		# Send /nuitrack_frame info
-		position_nuitrack = (0, 0, 1) # unité ?
-		# Convert the Euler angles to radians
-		roll = 90.0
-		pitch = 0.0
-		yaw = 0.0
-		roll_rad = math.radians(roll)
-		pitch_rad = math.radians(pitch)
-		yaw_rad = math.radians(yaw)
+		x = 0
+		y = 0
+		z = 1
+		position_nuitrack = (x, y, z) # NOTE : unit ?
 
-		# Convert the 3 Euler angles to a quaternion
+		# Euler angles in degrees
+		roll  = -90.0
+		pitch = 0.0
+		yaw   = 0.0
+
+		# Convert degrees to radians
+		roll_rad  = math.radians(roll)
+		pitch_rad = math.radians(pitch)
+		yaw_rad   = math.radians(yaw)
+
+		# Convert radians to a quaternion
 		rotation_nuitrack = tf.transformations.quaternion_from_euler(
 			roll_rad,
 			pitch_rad,
@@ -198,6 +230,7 @@ class SkeletonConverter:
 			axes='sxyz'
 		)
 		
+		# Broadcast
 		self.transform_broadcaster.sendTransform(
 			position_nuitrack,
 			rotation_nuitrack,
@@ -205,44 +238,6 @@ class SkeletonConverter:
 			"nuitrack_frame",
 			"map"
 		)
-
-		joints_moving = np.ones(20, dtype=bool)
-		# Send transform message for each joint
-		for joint_number in range(20):
-			translation = self.translation[id,joint_number, :]
-			rotation = tf.transformations.quaternion_from_euler(
-				euler_rotations[joint_number, 0],
-				euler_rotations[joint_number, 1],
-				euler_rotations[joint_number, 2])
-			time = rospy.Time.now()
-			child = str(self.joints[id][joint_number].type)+"_"+str(id)
-			parent = "/nuitrack_frame"
-
-			if not (translation == self.sent_translation[id, joint_number, :]).all():
-				if self.present_ids[id] == False:
-					self.present_ids[id] = True
-				self.transform_broadcaster.sendTransform(
-					translation,
-					rotation,
-					time,
-					child,
-					parent)
-			else:
-				joints_moving[joint_number] = False
-			
-			self.sent_translation[id, joint_number, :] = translation
-		
-		if np.all(joints_moving == False):
-			if self.present_ids[id] == True:
-				self.present_ids[id] = False
-
-
-	def launch(self) -> None:
-		"""Launches the nuitrack, ros node and starts updating."""
-
-		self.init_nuitrack()
-		rospy.init_node("tf_skeletons", anonymous=True)
-		self.update()
 
 
 if __name__ == '__main__':
