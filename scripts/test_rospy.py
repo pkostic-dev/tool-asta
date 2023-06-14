@@ -84,8 +84,8 @@ class SkeletonListener:
             try:
                 self.t = time.asctime(time.localtime(time.time()))
                 #self.lookup_joints(self.joints)
-                print(self.detect_angle(
-                    ["left_shoulder", "left_elbow", "left_wrist"]))
+                left_arm = ["left_shoulder", "left_elbow", "left_wrist"]
+                print(self.detect_angle(left_arm))
             except (tf.LookupException,
                     tf.ConnectivityException,
                     tf.ExtrapolationException) as exception:
