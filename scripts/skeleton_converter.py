@@ -33,8 +33,8 @@ class SkeletonConverter:
 		logging.info("Initialising tf.TransformBroadcaster object.")
 		self.transform_broadcaster = tf.TransformBroadcaster()
 		# Publishes when a human appears/disappears
-		self.presence_publisher = rospy.Publisher(
-			'human_presence',
+		self.human_gesture_publisher = rospy.Publisher(
+			'human_gesture',
 			String,
 			queue_size=1
 		)
@@ -257,7 +257,7 @@ class SkeletonConverter:
 
 				if _msg:
 					pass
-					self.presence_publisher.publish(_msg)
+					self.human_gesture_publisher.publish(_msg)
 					print(_msg)
 					print("\t", _x, _z)
 
