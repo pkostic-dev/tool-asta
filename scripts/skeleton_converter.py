@@ -219,9 +219,9 @@ class SkeletonConverter:
 					elif (_x > 0.5):
 						_msg = "human_%d_right" % id
 					
-					if (_z > 2):
+					if (_z < -2.0):
 						_msg += "_2m"
-					elif (_z > 1):
+					elif (_z < -1.0):
 						_msg += "_1m"
 
 					if _msg:
