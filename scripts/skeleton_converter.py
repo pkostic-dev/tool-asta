@@ -33,6 +33,13 @@ class SkeletonConverter:
 		logging.info("Initialising tf.TransformBroadcaster object.")
 		self.transform_broadcaster = tf.TransformBroadcaster()
 
+		# Publisher of human gestures
+		self.human_gesture_publisher = rospy.Publisher(
+			'human_gesture',
+			String,
+			queue_size=1
+		)
+
 		# The ids of percieved skeletons
 		self.ids = []
 		# Presence flags
@@ -184,6 +191,44 @@ class SkeletonConverter:
 				time = rospy.Time.now()
 				child = str(self.joints[id][joint_number].type)+"_"+str(id)
 				parent = "/nuitrack_frame"
+
+				# Triggers based on depth and lateral position
+				# z => profondeur ; x => lateral
+				# if torso
+				if (child == "torso_%d" % id):
+					_msg = ""
+					_x = translation[0]
+					_z = translation[2]
+					
+					# if (_z > 2):
+					# 	_msg = "human_%d_2meters" % id
+					# elif (_z > 1):
+					# 	_msg = "human_%d_1meter" % id
+
+					# if (_x > -0.1 and _x < 0.1):
+					# 	_msg = "human_%d_center" % id
+					# elif (_x < -0.5):
+					# 	_msg = "human_%d_left" % id
+					# elif (_x > 0.5):
+					# 	_msg = "human_%d_right" % id
+
+					if (_x > -0.5 and _x < 0.5):
+						_msg = "human_%d_center" % id
+					elif (_x < -0.5):
+						_msg = "human_%d_left" % id
+					elif (_x > 0.5):
+						_msg = "human_%d_right" % id
+					
+					if (_z > 2):
+						_msg += "_2m"
+					elif (_z > 1):
+						_msg += "_1m"
+
+					if _msg:
+						pass
+						self.human_gesture_publisher.publish(_msg)
+						print(_msg)
+						print("\t", _x, _z)
 
 				if not (translation == self.sent_translation[id, joint_number, :]).all():
 					if self.present_ids[id] == False:
