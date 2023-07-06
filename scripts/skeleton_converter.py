@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-import rospy
-import tf
-from PyNuitrack import py_nuitrack
-import numpy as np
 import logging
 import math
+
+import rospy
+import tf
+import numpy as np
+from PyNuitrack import py_nuitrack
+
 from std_msgs.msg import String
 
 
@@ -62,7 +64,6 @@ class SkeletonConverter:
 		update_frequency = 1.0 # in Hz
 		self.rospy_rate = rospy.Rate(update_frequency)
 
-
 	def init_nuitrack(self) -> None:
 		"""Initialises a Nuitrack object.
 		
@@ -107,14 +108,12 @@ class SkeletonConverter:
 		# Set up a shutdown hook for releasing Nuitrack from memory.
 		rospy.on_shutdown(self.shutdown_hook)
 
-
 	def shutdown_hook(self) -> None:
 		"""Shutdown hook for the Nuitrack object."""
 
 		logging.info("Shutting down nuitrack.")
 		if self.nuitrack != None:
 			self.nuitrack.release()
-
 
 	def launch(self) -> None:
 		"""Continuously update Nuitrack, get skeleton data, and load it."""
@@ -129,7 +128,6 @@ class SkeletonConverter:
 		except KeyboardInterrupt:
 			rospy.signal_shutdown("KeyboardInterrupt")
 			raise SystemExit
-
 	
 	def store_skeletons(self, data) -> None:
 		"""Store the skeletons data from Nuitrack."""
@@ -149,14 +147,12 @@ class SkeletonConverter:
 				id = len(self.ids)-1
 				self.joints.append(data.skeletons[skeleton][1:])
 
-
 	def store_joints(self, id) -> None:
 		for joint in range(0,20):
 			self.translation[id,joint,:] = \
 				(-np.array(self.joints[id][joint].real)/1000.0).tolist() 
 			self.rotation[id,joint,:] = \
 				self.joints[id][joint].orientation.flatten()
-
 
 	def broadcast_skeletons(self) -> None:
 		"""Function send Transform information of every point of skeletons"""
@@ -212,21 +208,19 @@ class SkeletonConverter:
 					# elif (_x > 0.5):
 					# 	_msg = "human_%d_right" % id
 
-					if (_x > -0.5 and _x < 0.5):
-						_msg = "human_%d_center" % id
-					elif (_x < -0.5):
+					if (_x < -0):
 						_msg = "human_%d_left" % id
-					elif (_x > 0.5):
+					elif (_x > 0):
 						_msg = "human_%d_right" % id
 					
-					if (_z < -2.0):
+					if (_z < -3.0):
 						_msg += "_2m"
 					elif (_z < -1.0):
 						_msg += "_1m"
 
 					if _msg:
 						pass
-						self.human_gesture_publisher.publish(_msg)
+						#self.human_gesture_publisher.publish(_msg)
 						print(_msg)
 						print("\t", _x, _z)
 
@@ -247,7 +241,10 @@ class SkeletonConverter:
 			if np.all(joints_moving == False):
 				if self.present_ids[id] == True:
 					self.present_ids[id] = False
-
+			else:
+				self.human_gesture_publisher.publish(_msg)
+				print("Published : " + _msg)
+				print("\t", _x, _z)
 
 	def broadcast_nuitrack_frame(self) -> None:
 		"""Broadcasts nuitrack frame (camera position, manual configuration)."""
