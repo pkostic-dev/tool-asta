@@ -44,8 +44,7 @@ if __name__ == "__main__":
                 print("This camera has already been activated.")
         else:
             print(
-                "Detected a camera that is not an Intel RealSense \
-                         camera."
+                "Detected a camera that is not an Intel RealSense camera."
             )
     else:
         print("Didn't detect any cameras.")
