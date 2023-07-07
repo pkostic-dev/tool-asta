@@ -168,19 +168,19 @@ class SkeletonConverter:
                 joint_name = str(self.joints[id_index][joint].type)
                 child = joint_name + "_" + str(id_index)
                 parent = "/nuitrack_frame"
-                confidence = self.confidence[id_index][joint]
 
                 # Currently confidence is either 0.0 or 0.75
                 # NOTE : confidence is not enough to get rid of invalid
                 #        points (invisible people)
+                confidence = self.confidence[id_index][joint]
                 if confidence > 0.5:
-                    msg = "[{time}] {child}({conf}) = \n\t{t}\n\t{r}"
+                    msg = "[{time}] {child}({conf}) = \n\t{tsl}\n\t{rot}"
                     print(msg.format(
                         time=time,
                         child=child,
                         conf=confidence,
-                        t=translation,
-                        r=rotation
+                        tsl=translation,
+                        rot=rotation
                         ))
                     self.transform_broadcaster.sendTransform(
                         translation, rotation, time, child, parent
