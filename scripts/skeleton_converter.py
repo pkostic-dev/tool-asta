@@ -149,6 +149,7 @@ class SkeletonConverter:
 
             # Broadcast transform message for each joint
             for joint in range(self.nb_joints):
+                # Rotation to euler
                 rotations = self.rotation[id_index, joint, :]
                 matrix = np.mat(
                     [
@@ -170,6 +171,8 @@ class SkeletonConverter:
                 confidence = self.confidence[id_index][joint]
 
                 # Currently confidence is either 0.0 or 0.75
+                # NOTE : confidence is not enough to get rid of invalid
+                #        points (invisible people)
                 if confidence > 0.5:
                     msg = "[{time}] {child}({conf}) = \n\t{t}\n\t{r}"
                     print(msg.format(
