@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 
+import time
+from math import degrees
+
 import rospy
-from tf import TransformListener
+import numpy as np
+
+from tf import TransformListener, LookupException, ExtrapolationException, ConnectivityException, transformations
 from std_msgs.msg import String
 
 
@@ -12,8 +17,9 @@ class GestureDetector():
         rospy.init_node("gesture_detector", anonymous=True)
 
         self.root_frame = "map" # NOTE : root frame, might have to change it
-        update_frequency = 10.0  # NOTE : in Hz
+        update_frequency = 1.0  # NOTE : in Hz
         self.rospy_rate = rospy.Rate(update_frequency)
+        self.time = 0
         self.gesture_publisher = rospy.Publisher(
             'gesture', String, queue_size=1
             )
@@ -36,10 +42,11 @@ class GestureDetector():
                     joint_name, self.root_frame, rospy.Time(0))
                 result.append((tslt, rttn))
                 print("[%s] Joint %s : \n\t trans : %s\n\t rot : %s" %
-                    (self.t, joint_name, tslt, rttn))
+                    (self.time, joint_name, tslt, rttn))
         return result
 
     def _update(self) -> None:
+        self.time = time.asctime(time.localtime(time.time()))
         all_joints = self.lookup_joints(self.joints)
         print(all_joints)
         self.rospy_rate.sleep()
@@ -49,7 +56,14 @@ class GestureDetector():
 
         try:
             while not rospy.is_shutdown():
-                self._update()
+                try:
+                    self._update()
+                except (LookupException,
+                    ConnectivityException,
+                    ExtrapolationException) as exception:
+                    pass
+                    # msg = "[{t}] Exception {exception}"
+                    # print(msg.format(t=self.time, exception=exception))
         except KeyboardInterrupt:
             rospy.signal_shutdown("KeyboardInterrupt")
             raise SystemExit
@@ -66,9 +80,9 @@ class GestureDetector():
 
 
     def calculate_angle(self, pointA, vertex, pointB) -> float:
-        r1 = tf.transformations.quaternion_matrix(pointA)
-        r2 = tf.transformations.quaternion_matrix(vertex)
-        r3 = tf.transformations.quaternion_matrix(pointB)
+        r1 = transformations.quaternion_matrix(pointA)
+        r2 = transformations.quaternion_matrix(vertex)
+        r3 = transformations.quaternion_matrix(pointB)
 
         relative_rotation = r2[:3, :3].T @ r1[:3, :3]
         relative_rotation = self.pad_matrix(relative_rotation)
@@ -79,11 +93,11 @@ class GestureDetector():
         rotation_at_vertex = inverse_relative_rotation @ relative_rotation
         rotation_at_vertex = self.pad_matrix(rotation_at_vertex)
 
-        rotation_quaternion = tf.transformations.quaternion_from_matrix(
+        rotation_quaternion = transformations.quaternion_from_matrix(
             rotation_at_vertex)
-        angles = tf.transformations.euler_from_quaternion(rotation_quaternion)
+        angles = transformations.euler_from_quaternion(rotation_quaternion)
         angle_at_vertex = angles[2]
-        angle_at_vertex_degrees = math.degrees(angle_at_vertex)
+        angle_at_vertex_degrees = degrees(angle_at_vertex)
 
         return angle_at_vertex_degrees
 
