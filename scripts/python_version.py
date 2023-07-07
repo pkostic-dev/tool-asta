@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
-# You can use this script to check which version of python is currently
-# interpreting for ROS.
-
 import sys
+
+"""Execute this script to check to what version python3 is linked."""
 
 print(sys.version)
