@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
-import math
+from math import radians
 
 import rospy
-import tf
 import numpy as np
+from tf import TransformBroadcaster
+from tf import transformations
 from PyNuitrack import py_nuitrack
-
-from std_msgs.msg import String
 
 
 class SkeletonConverter:
@@ -31,10 +30,10 @@ class SkeletonConverter:
         self.nb_joints = 20
         self.max_ids = 10
         self.translation_scale = 1000.0
-        update_frequency = 1.0  # NOTE : in Hz
+        update_frequency = 10.0  # NOTE : in Hz
         self.rospy_rate = rospy.Rate(update_frequency)
         self.nuitrack = py_nuitrack.Nuitrack()
-        self.transform_broadcaster = tf.TransformBroadcaster()
+        self.transform_broadcaster = TransformBroadcaster()
         # The ids of percieved skeletons
         self.ids = []
         # List containing joints of each skeleton (20 joints per skeleton)
@@ -43,6 +42,8 @@ class SkeletonConverter:
         self.translation = np.zeros([self.max_ids, self.nb_joints, 3])
         # The rotation of every joint in space [ids, joints, matrix]
         self.rotation = np.zeros([self.max_ids, self.nb_joints, 9])
+        # The confidence of every joint (0.0 to 1.0 theoretically)
+        self.confidence = np.zeros([self.max_ids, self.nb_joints])
 
         self._init_nuitrack()
 
@@ -122,10 +123,10 @@ class SkeletonConverter:
                 self.ids.append(id)
                 id_index = len(self.ids) - 1
                 self.joints.append(joints)
-            self._store_joints(id_index)
+            self._store_joint_values(id_index)
 
-    def _store_joints(self, id) -> None:
-        """Store joints."""
+    def _store_joint_values(self, id) -> None:
+        """Store joint values into separate lists"""
 
         for joint in range(self.nb_joints):
             joint_translation = self.joints[id][joint].real
@@ -134,6 +135,8 @@ class SkeletonConverter:
             joint_rotation = self.joints[id][joint].orientation
             flattened = joint_rotation.flatten()
             self.rotation[id, joint, :] = flattened
+            joint_confidence = self.joints[id][joint].confidence
+            self.confidence[id, joint] = joint_confidence
 
     def _broadcast_skeletons(self) -> None:
         """Function send Transform information of every point of skeletons"""
@@ -141,9 +144,13 @@ class SkeletonConverter:
         for id in self.ids:
             id_index = self.ids.index(id)
 
+            # Broadcast /nuitrack_frame position and rotation (camera)
+            self._broadcast_nuitrack_frame()
+
             # Calculate the rotation in Euler angles. [joint, xyz]
             euler_rotations = np.zeros([20, 3])
 
+            # TODO : combine the 2 for loops in the block if possible
             for joint in range(self.nb_joints):
                 rotations = self.rotation[id_index, joint, :]
                 matrix = np.mat(
@@ -153,16 +160,13 @@ class SkeletonConverter:
                         [rotations[6], rotations[7], rotations[8]],
                     ]
                 )
-                euler_rotation = tf.transformations.euler_from_matrix(matrix, "rxyz")
+                euler_rotation = transformations.euler_from_matrix(matrix, "rxyz")
                 euler_rotations[joint, :] = euler_rotation
-
-            # Broadcast /nuitrack_frame position and rotation (camera)
-            self._broadcast_nuitrack_frame()
 
             # Broadcast transform message for each joint
             for joint in range(self.nb_joints):
                 translation = self.translation[id_index, joint, :]
-                rotation = tf.transformations.quaternion_from_euler(
+                rotation = transformations.quaternion_from_euler(
                     euler_rotations[joint, 0],
                     euler_rotations[joint, 1],
                     euler_rotations[joint, 2],
@@ -171,12 +175,21 @@ class SkeletonConverter:
                 joint_name = str(self.joints[id_index][joint].type)
                 child = joint_name + "_" + str(id_index)
                 parent = "/nuitrack_frame"
+                confidence = self.confidence[id_index][joint]
 
-                msg = "[{time}] {child} = \t{translation} ; {rotation}"
-                print(msg.format(time, child, translation, rotation))
-                self.transform_broadcaster.sendTransform(
-                    translation, rotation, time, child, parent
-                )
+                # Currently confidence is either 0.0 or 0.75
+                if confidence > 0.5:
+                    msg = "[{time}] {child}({conf}) = \n\t{t}\n\t{r}"
+                    print(msg.format(
+                        time=time,
+                        child=child,
+                        conf=confidence,
+                        t=translation,
+                        r=rotation
+                        ))
+                    self.transform_broadcaster.sendTransform(
+                        translation, rotation, time, child, parent
+                    )
 
     def _broadcast_nuitrack_frame(self) -> None:
         """Broadcasts the camera location tf."""
@@ -194,12 +207,12 @@ class SkeletonConverter:
         yaw = 0.0
 
         # Convert degrees to radians
-        roll_rad = math.radians(roll)
-        pitch_rad = math.radians(pitch)
-        yaw_rad = math.radians(yaw)
+        roll_rad = radians(roll)
+        pitch_rad = radians(pitch)
+        yaw_rad = radians(yaw)
 
         # Convert radians to a quaternion
-        rotation = tf.transformations.quaternion_from_euler(
+        rotation = transformations.quaternion_from_euler(
             roll_rad, pitch_rad, yaw_rad, axes="sxyz"
         )
 
