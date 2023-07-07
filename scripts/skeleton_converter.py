@@ -190,10 +190,11 @@ class SkeletonConverter:
         """Broadcasts the camera location tf."""
 
         # Translation
+        # NOTE : unit might be in meters
         x = 0
         y = 0
         z = 1
-        translation = (x, y, z)  # NOTE : unit might be in meters
+        translation = (x, y, z)
 
         # Rotation
         # Euler angles in degrees
