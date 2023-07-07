@@ -145,12 +145,9 @@ class SkeletonConverter:
             id_index = self.ids.index(id)
 
             # Broadcast /nuitrack_frame position and rotation (camera)
-            self._broadcast_nuitrack_frame()
+            self._broadcast_nuitrack_frame()       
 
-            # Calculate the rotation in Euler angles. [joint, xyz]
-            euler_rotations = np.zeros([20, 3])
-
-            # TODO : combine the 2 for loops in the block if possible
+            # Broadcast transform message for each joint
             for joint in range(self.nb_joints):
                 rotations = self.rotation[id_index, joint, :]
                 matrix = np.mat(
@@ -161,15 +158,10 @@ class SkeletonConverter:
                     ]
                 )
                 euler_rotation = transformations.euler_from_matrix(matrix, "rxyz")
-                euler_rotations[joint, :] = euler_rotation
 
-            # Broadcast transform message for each joint
-            for joint in range(self.nb_joints):
                 translation = self.translation[id_index, joint, :]
                 rotation = transformations.quaternion_from_euler(
-                    euler_rotations[joint, 0],
-                    euler_rotations[joint, 1],
-                    euler_rotations[joint, 2],
+                    *euler_rotation
                 )
                 time = rospy.Time.now()
                 joint_name = str(self.joints[id_index][joint].type)
