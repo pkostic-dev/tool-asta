@@ -29,6 +29,8 @@ class SkeletonConverter:
         rospy.init_node("tf_skeletons", anonymous=True)
         self.nb_joints = 20
         self.max_ids = 10
+        self.camera_frame = "nuitrack_frame" # NOTE : camera location tf
+        self.root_frame = "map" # NOTE : root frame, might have to change it
         self.translation_scale = 1000.0
         update_frequency = 10.0  # NOTE : in Hz
         self.rospy_rate = rospy.Rate(update_frequency)
@@ -212,11 +214,9 @@ class SkeletonConverter:
             roll_rad, pitch_rad, yaw_rad, axes="sxyz"
         )
 
-        child = "nuitrack_frame"  # NOTE : camera location tf
-        parent = "map"  # NOTE : root frame, might have to change it
-
         self.transform_broadcaster.sendTransform(
-            translation, rotation, rospy.Time.now(), child, parent
+            translation, rotation, rospy.Time.now(),
+            self.camera_frame, self.root_frame
         )
 
     def launch(self) -> None:
