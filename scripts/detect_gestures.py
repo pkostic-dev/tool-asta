@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import time
-from math import degrees
+from math import degrees, sqrt
 
 import rospy
 import numpy as np
@@ -33,7 +33,7 @@ class GestureDetector():
                        "left_hip", "left_knee", "left_ankle",
                        "right_hip", "right_knee", "right_ankle"]
 
-    def lookup_joints(self, joints, ids=[0]) -> list:
+    def _lookup_joints(self, joints, ids=[0]) -> list:
         result = []
         for id in ids:
             for joint in joints:
@@ -41,14 +41,15 @@ class GestureDetector():
                 (tslt, rttn) = self.transform_listener.lookupTransform(
                     joint_name, self.root_frame, rospy.Time(0))
                 result.append((tslt, rttn))
-                print("[%s] Joint %s : \n\t trans : %s\n\t rot : %s" %
-                    (self.time, joint_name, tslt, rttn))
+                # print("[%s] Joint %s : \n\t trans : %s\n\t rot : %s" %
+                #     (self.time, joint_name, tslt, rttn))
         return result
 
     def _update(self) -> None:
         self.time = time.asctime(time.localtime(time.time()))
-        all_joints = self.lookup_joints(self.joints)
-        print(all_joints)
+        # all_joints = self._lookup_joints(self.joints)
+        # print(all_joints)
+        self.detect_angle(["head", "neck", "torso"])
         self.rospy_rate.sleep()
 
     def launch(self) -> None:
@@ -71,45 +72,71 @@ class GestureDetector():
     ###############
 
     def detect_angle(self, joints):
-        transformations = self.lookup_joints(joints)
+        transformations = self._lookup_joints(joints)
         orientations = [t[1] for t in transformations]
-        angle = self.calculate_angle(*orientations)
+        angle = calculate_angle(*orientations)
         if angle > 85 and angle < 95:
             print("90 degrees")
         print(angle)
 
 
-    def calculate_angle(self, pointA, vertex, pointB) -> float:
-        r1 = transformations.quaternion_matrix(pointA)
-        r2 = transformations.quaternion_matrix(vertex)
-        r3 = transformations.quaternion_matrix(pointB)
+def calculate_angle(pointA, vertex, pointB) -> float:
+    r1 = transformations.quaternion_matrix(pointA)
+    r2 = transformations.quaternion_matrix(vertex)
+    r3 = transformations.quaternion_matrix(pointB)
 
-        relative_rotation = r2[:3, :3].T @ r1[:3, :3]
-        relative_rotation = self.pad_matrix(relative_rotation)
+    relative_rotation = r2[:3, :3].T @ r1[:3, :3]
+    relative_rotation = pad_matrix(relative_rotation)
 
-        inverse_relative_rotation = r2[:3, :3].T @ r3[:3, :3]
-        inverse_relative_rotation = self.pad_matrix(inverse_relative_rotation)
-        
-        rotation_at_vertex = inverse_relative_rotation @ relative_rotation
-        rotation_at_vertex = self.pad_matrix(rotation_at_vertex)
+    inverse_relative_rotation = r2[:3, :3].T @ r3[:3, :3]
+    inverse_relative_rotation = pad_matrix(inverse_relative_rotation)
+    
+    rotation_at_vertex = inverse_relative_rotation @ relative_rotation
+    rotation_at_vertex = pad_matrix(rotation_at_vertex)
 
-        rotation_quaternion = transformations.quaternion_from_matrix(
-            rotation_at_vertex)
-        angles = transformations.euler_from_quaternion(rotation_quaternion)
-        angle_at_vertex = angles[2]
-        angle_at_vertex_degrees = degrees(angle_at_vertex)
+    rotation_quaternion = transformations.quaternion_from_matrix(
+        rotation_at_vertex)
+    angles = transformations.euler_from_quaternion(rotation_quaternion)
+    angle_at_vertex = angles[2]
+    angle_at_vertex_degrees = degrees(angle_at_vertex)
 
-        return angle_at_vertex_degrees
+    return angle_at_vertex_degrees
 
 
-    def pad_matrix(self, mat):
-        """
-        Pad a 3x3 matrix with an extra row and column to make it 4x4.
-        """
-        padded = np.pad(mat, ((0, 1), (0, 1)), mode='constant')
-        padded[3, 3] = 1.0
-        return padded
+def pad_matrix(matrix) -> np.ndarray:
+    """
+    Pad a 3x3 matrix with an extra row and column to make it 4x4.
+    """
+    padded_matrix = np.pad(matrix, ((0, 1), (0, 1)), mode='constant')
+    padded_matrix[3, 3] = 1.0
+    print(type(padded_matrix))
+    return padded_matrix
 
+
+def is_point_inside_circle(center_x, center_y, radius, point_x, point_y) -> bool:
+    distance = sqrt((point_x - center_x) ** 2 + (point_y - center_y) ** 2)
+    return distance <= radius
+
+
+""" TODO
+1. "save" tfs for a given joint list and then load them (files)
+    -> new script
+2. verify if angles are correct
+    -> testing
+3. publish triggers for positions and angles
+    -> easy
+4. remake the threshold but with a rectangle not a line
+    -> easy
+5. human_appear and human_disappear
+    -> need to fix invisible people in skeleton converter
+6. other easy shapes ? (ellipse)
+    -> ask chat GPT
+7. threshold for 3D positions (+height) for lifting arm etc.
+    -> easy ?
+8. add basic gestures
+    -> time consuming, need another person
+
+"""
 
 if __name__ == "__main__":
     GD = GestureDetector()
