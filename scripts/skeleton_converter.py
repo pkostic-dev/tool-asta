@@ -4,6 +4,7 @@ from math import radians
 
 import rospy
 import numpy as np
+
 from tf import TransformBroadcaster
 from tf import transformations
 from PyNuitrack import py_nuitrack
@@ -32,7 +33,7 @@ class SkeletonConverter:
         self.camera_frame = "nuitrack_frame" # NOTE : camera location tf
         self.root_frame = "map" # NOTE : root frame, might have to change it
         self.translation_scale = 1000.0
-        update_frequency = 10.0  # NOTE : in Hz
+        update_frequency = 100.0  # NOTE : in Hz
         self.rospy_rate = rospy.Rate(update_frequency)
         self.nuitrack = py_nuitrack.Nuitrack()
         self.transform_broadcaster = TransformBroadcaster()

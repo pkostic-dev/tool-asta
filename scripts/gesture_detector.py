@@ -17,7 +17,7 @@ class GestureDetector():
         rospy.init_node("gesture_detector", anonymous=True)
 
         self.root_frame = "map" # NOTE : root frame, might have to change it
-        update_frequency = 1.0  # NOTE : in Hz
+        update_frequency = 100.0  # NOTE : in Hz
         self.rospy_rate = rospy.Rate(update_frequency)
         self.time = 0
         self.gesture_publisher = rospy.Publisher(
@@ -49,7 +49,7 @@ class GestureDetector():
         self.time = time.asctime(time.localtime(time.time()))
         # all_joints = self._lookup_joints(self.joints)
         # print(all_joints)
-        self.detect_angle(["head", "neck", "torso"])
+        self.detect_angle(["left_wrist", "left_elbow", "left_shoulder"])
         self.rospy_rate.sleep()
 
     def launch(self) -> None:
@@ -123,6 +123,7 @@ def is_point_inside_circle(center_x, center_y, radius, point_x, point_y) -> bool
     -> new script
 2. verify if angles are correct
     -> testing
+    -> angles at different axis
 3. publish triggers for positions and angles
     -> easy
 4. remake the threshold but with a rectangle not a line
