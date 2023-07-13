@@ -33,7 +33,7 @@ class SkeletonConverter:
         self.camera_frame = "nuitrack_frame" # NOTE : camera location tf
         self.root_frame = "map" # NOTE : root frame, might have to change it
         self.translation_scale = 1000.0
-        update_frequency = 100.0  # NOTE : in Hz
+        update_frequency = 10.0  # NOTE : in Hz
         self.rospy_rate = rospy.Rate(update_frequency)
         self.nuitrack = py_nuitrack.Nuitrack()
         self.transform_broadcaster = TransformBroadcaster()
@@ -47,6 +47,8 @@ class SkeletonConverter:
         self.rotation = np.zeros([self.max_ids, self.nb_joints, 9])
         # The confidence of every joint (0.0 to 1.0 theoretically)
         self.confidence = np.zeros([self.max_ids, self.nb_joints])
+        # The previously sent translations of every joint in space
+        self.last_translation = np.zeros([self.max_ids, self.nb_joints, 3])
 
         self._init_nuitrack()
 
@@ -163,6 +165,7 @@ class SkeletonConverter:
                 )
                 euler_rotation = transformations.euler_from_matrix(matrix, "rxyz")
 
+                last_translation = self.last_translation[id_index, joint, :]
                 translation = self.translation[id_index, joint, :]
                 rotation = transformations.quaternion_from_euler(
                     *euler_rotation
@@ -176,8 +179,14 @@ class SkeletonConverter:
                 # NOTE : confidence is not enough to get rid of invalid
                 #        points (invisible people)
                 confidence = self.confidence[id_index][joint]
-                if confidence > 0.5:
-                    msg = "[{time}] {child}({conf}) = \n\t{tsl}\n\t{rot}"
+
+                similar = self._check_similar_array(
+                    translation,
+                    last_translation)
+
+                if ((confidence > 0.5) and not similar):
+                    msg = "[{time}] {child}({conf}) = {tsl} {rot}"
+
                     print(msg.format(
                         time=time,
                         child=child,
@@ -185,9 +194,21 @@ class SkeletonConverter:
                         tsl=translation,
                         rot=rotation
                         ))
+                    print(translation, '\n', last_translation)
                     self.transform_broadcaster.sendTransform(
                         translation, rotation, time, child, parent
                     )
+                    self.last_translation[id_index, joint, :] = translation
+
+    def _check_similar_array(self, arr1, arr2):
+        """
+        Checks if two ndarrays have similar values up to the 5th digit after the decimal point.
+        """
+
+        rounded_arr1 = np.round(arr1, decimals=5)
+        rounded_arr2 = np.round(arr2, decimals=5)
+
+        return np.array_equal(rounded_arr1, rounded_arr2)
 
     def _broadcast_nuitrack_frame(self) -> None:
         """Broadcasts the camera location tf."""

@@ -17,7 +17,7 @@ class GestureDetector():
         rospy.init_node("gesture_detector", anonymous=True)
 
         self.root_frame = "map" # NOTE : root frame, might have to change it
-        update_frequency = 100.0  # NOTE : in Hz
+        update_frequency = 10.0  # NOTE : in Hz
         self.rospy_rate = rospy.Rate(update_frequency)
         self.time = 0
         self.gesture_publisher = rospy.Publisher(
@@ -75,8 +75,6 @@ class GestureDetector():
         transformations = self._lookup_joints(joints)
         orientations = [t[1] for t in transformations]
         angle = calculate_angle(*orientations)
-        if angle > 85 and angle < 95:
-            print("90 degrees")
         print(angle)
 
 
@@ -113,29 +111,27 @@ def pad_matrix(matrix) -> np.ndarray:
     return padded_matrix
 
 
-def is_point_inside_circle(center_x, center_y, radius, point_x, point_y) -> bool:
+def is_point_inside_circle(center_x, center_y, rad, point_x, point_y) -> bool:
     distance = sqrt((point_x - center_x) ** 2 + (point_y - center_y) ** 2)
-    return distance <= radius
+    return distance <= rad
 
 
 """ TODO
-1. "save" tfs for a given joint list and then load them (files)
-    -> new script
 2. verify if angles are correct
     -> testing
-    -> angles at different axis
 3. publish triggers for positions and angles
     -> easy
 4. remake the threshold but with a rectangle not a line
     -> easy
-5. human_appear and human_disappear
-    -> need to fix invisible people in skeleton converter
 6. other easy shapes ? (ellipse)
     -> ask chat GPT
 7. threshold for 3D positions (+height) for lifting arm etc.
     -> easy ?
 8. add basic gestures
     -> time consuming, need another person
+    -> T pose
+    -> mains en air (1 our 2, G ou D)
+9. average of all points
 
 """
 

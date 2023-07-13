@@ -5,9 +5,9 @@ import sys
 import select
 import tty
 import pickle
+from datetime import datetime
 
 import rospy
-import rospkg
 from tf import TransformListener, LookupException, ExtrapolationException, ConnectivityException, transformations
 
 
@@ -34,25 +34,30 @@ class GestureCreator():
 
         rospy.init_node("gesture_creator", anonymous=True)
         self.root_frame = "map" # NOTE : root frame, might have to change it
-        update_frequency = 1.0  # NOTE : in Hz
+        update_frequency = 10.0  # NOTE : in Hz
         self.rospy_rate = rospy.Rate(update_frequency)
         self.transform_listener = TransformListener()
         self.joints = ["torso"]
+
+        print("Usage :")
+        print("  [ Save : s ]    [ Load : l ]    [ Exit : e ]  ")
     
     def _update(self) -> None:
         key = get_key(0.1)
         if (len(key)):
-            print("Pressed a key")
+            print("Pressed key : " + key)
             self._keyboard_callback(key)
         self.rospy_rate.sleep()
 
     def _keyboard_callback(self, key) -> None:
         if key == 's':
-            print("Pressed 's'")
-            self._save_joints()
+            self._save()
+
         if key == 'l':
-            print("Pressed 'l'")
-            self._load_joints()
+            self._load()
+
+        if key == 'e':
+            self._exit()
 
     def _lookup_joints(self, joints, ids=[0]) -> list:
         result = []
@@ -62,38 +67,64 @@ class GestureCreator():
                 (tslt, rttn) = self.transform_listener.lookupTransform(
                     joint_name, self.root_frame, rospy.Time(0))
                 result.append((tslt, rttn))
+        # TODO : turn into dict and add joint names, translation, rotation
         return result
 
-    def _save_joints(self):
-        print("Looking up ", self.joints)
-        transformations = self._lookup_joints(self.joints)
-        print("Got joints : ", transformations)
+    def _save(self) -> None:
+        print("Saving...")
+        joints = self._lookup_joints(self.joints)
 
-        file_name = 'joints.pkl'
+        print("Enter the file name : ", end="")
+        file_name = input()
+        if not file_name:
+            now = datetime.now()
+            now_str = now.strftime("-%Y-%m-%d-%H-%M-%S")
+            file_name = 'joints' + now_str
+        if file_name[-4:] != '.pkl':
+            file_name += '.pkl'
+
+        print("Saving to", file_name)
+
+        self._save_joints(joints, file_name)
+
+    def _load(self) -> None:
+        print("Loading...")
+        print("Enter the file name : ", end='')
+        file_name = input()
+        if file_name[-4:] != '.pkl':
+            file_name += '.pkl'
+        print("Loading", file_name)
+        print(self._load_joints(file_name))
+
+    def _exit(self) -> None:
+        print("Exiting...")
+        raise SystemExit
+
+    def _save_joints(self, joints, file_name) -> None:
         with open(file_name, 'wb') as file:
-            pickle.dump(transformations, file)
+            pickle.dump(joints, file)
         file.close()
 
-    def _load_joints(self):
-        transformations = []
-        file_name = 'joints.pkl'
+    def _load_joints(self, file_name = 'joints.pkl') -> list:
+        joints = []
         with open(file_name, 'rb') as file:
-            transformations = pickle.load(file)
+            joints = pickle.load(file)
         file.close()
-        print(transformations)
+        return joints
 
     def launch(self) -> None:
-        try:
-            while not rospy.is_shutdown():
-                try:
-                    self._update()
-                except (LookupException,
-                    ConnectivityException,
-                    ExtrapolationException) as exception:
-                    pass
-        except KeyboardInterrupt:
-            rospy.signal_shutdown("KeyboardInterrupt")
-            raise SystemExit
+        while not rospy.is_shutdown():
+            try:
+                self._update()
+            except (LookupException,
+                ConnectivityException,
+                ExtrapolationException) as exception:
+                pass
+            except FileNotFoundError:
+                print("File not found.")
+            except KeyboardInterrupt:
+                rospy.signal_shutdown("KeyboardInterrupt")
+                raise SystemExit
 
 
 if __name__ == "__main__":
