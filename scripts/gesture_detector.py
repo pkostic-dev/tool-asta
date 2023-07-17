@@ -2,6 +2,7 @@
 
 import time
 from math import degrees, sqrt
+import pprint
 
 import rospy
 import numpy as np
@@ -33,23 +34,33 @@ class GestureDetector():
                        "left_hip", "left_knee", "left_ankle",
                        "right_hip", "right_knee", "right_ankle"]
 
-    def _lookup_joints(self, joints, ids=[0]) -> list:
-        result = []
+    def _lookup_joints(self, joints, ids=[0]) -> dict:
+        result = dict()
         for id in ids:
             for joint in joints:
                 joint_name = joint + "_" + str(id)
                 (tslt, rttn) = self.transform_listener.lookupTransform(
                     joint_name, self.root_frame, rospy.Time(0))
-                result.append((tslt, rttn))
-                # print("[%s] Joint %s : \n\t trans : %s\n\t rot : %s" %
-                #     (self.time, joint_name, tslt, rttn))
+                result[joint] = (tslt, rttn)
         return result
+    
+    def _detect_angle(self, joints):
+        # TODO update for dict
+        transformations = self._lookup_joints(joints)
+        orientations = [t[1] for t in transformations]
+        angle = calculate_angle(*orientations)
+        print(angle)
+
+    def _detect_joints(self, joints) -> dict:
+        jnts = self._lookup_joints(joints)
+        pprint.pprint(jnts)
 
     def _update(self) -> None:
         self.time = time.asctime(time.localtime(time.time()))
         # all_joints = self._lookup_joints(self.joints)
         # print(all_joints)
-        self.detect_angle(["left_wrist", "left_elbow", "left_shoulder"])
+        #self._detect_angle(["left_wrist", "left_elbow", "left_shoulder"])
+        self._detect_joints(["torso"])
         self.rospy_rate.sleep()
 
     def launch(self) -> None:
@@ -71,11 +82,7 @@ class GestureDetector():
         
     ###############
 
-    def detect_angle(self, joints):
-        transformations = self._lookup_joints(joints)
-        orientations = [t[1] for t in transformations]
-        angle = calculate_angle(*orientations)
-        print(angle)
+
 
 
 def calculate_angle(pointA, vertex, pointB) -> float:
