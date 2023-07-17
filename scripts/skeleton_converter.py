@@ -16,7 +16,8 @@ class SkeletonConverter:
     This class initialises a Nuitrack object. Converts the data obtained from
     it into TF skeleton data. And publishes the TF skeleton data to ROS with a
     TransformBroadcaster object. This class is a mix of an Adapter pattern
-    class and a publisher class.
+    class and a publisher class. It doesn't publish joints with less than 0.5
+    confidence and it doesn't publish the same joint data twice.
     """
 
     def __init__(self) -> None:
@@ -150,7 +151,7 @@ class SkeletonConverter:
             id_index = self.ids.index(id)
 
             # Broadcast /nuitrack_frame position and rotation (camera)
-            self._broadcast_nuitrack_frame()       
+            self._broadcast_nuitrack_frame()
 
             # Broadcast transform message for each joint
             for joint in range(self.nb_joints):
@@ -163,7 +164,8 @@ class SkeletonConverter:
                         [rotations[6], rotations[7], rotations[8]],
                     ]
                 )
-                euler_rotation = transformations.euler_from_matrix(matrix, "rxyz")
+                euler_rotation = transformations.euler_from_matrix(
+                    matrix, "rxyz")
 
                 last_translation = self.last_translation[id_index, joint, :]
                 translation = self.translation[id_index, joint, :]
@@ -176,25 +178,21 @@ class SkeletonConverter:
                 parent = "/nuitrack_frame"
 
                 # Currently confidence is either 0.0 or 0.75
-                # NOTE : confidence is not enough to get rid of invalid
-                #        points (invisible people)
+                
                 confidence = self.confidence[id_index][joint]
-
                 similar = self._check_similar_array(
                     translation,
                     last_translation)
-
+                
+                # NOTE : Confidence is not enough to get rid of invalid
+                #        points (static invisible people), so we check
+                #        for very similar translations and don't publish
+                #        them.
                 if ((confidence > 0.5) and not similar):
                     msg = "[{time}] {child}({conf}) = {tsl} {rot}"
 
-                    print(msg.format(
-                        time=time,
-                        child=child,
-                        conf=confidence,
-                        tsl=translation,
-                        rot=rotation
-                        ))
-                    print(translation, '\n', last_translation)
+                    print(msg.format(time=time, child=child, conf=confidence,
+                        tsl=translation, rot=rotation))
                     self.transform_broadcaster.sendTransform(
                         translation, rotation, time, child, parent
                     )
