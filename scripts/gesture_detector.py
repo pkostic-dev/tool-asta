@@ -46,6 +46,46 @@ class GestureDetector():
                        "left_hip", "left_knee", "left_ankle",
                        "right_hip", "right_knee", "right_ankle"]
         self.treasure = self._load_joints('treasure.pkl')
+        self.goal = self.treasure
+
+        # Distance check
+        duration = 2 # NOTE : shorter for debugging purpose
+        self._timed_distance_checker(self.treasure, duration,
+                                     self._distance_callback)
+
+    def _timed_distance_checker(self, target_joint, duration, callback):
+        self.goal = target_joint
+        rospy.Timer(rospy.Duration(duration), callback)
+
+    def _distance_callback(self, _):
+        # Check distance from the treasure point
+        (dist_x, dist_y, _) = self._check_distance(self.goal)
+        if dist_x > 0.3:
+            print("dist_x > 0.3")
+        if dist_x < 0.3:
+            print("dist_x < 0.3")
+        if dist_y > 0.3:
+            print("dist_y > 0.3")
+        if dist_y < 0.3:
+            print("dist_y < 0.3")
+        # self.human_gesture_publisher.publish(distance)
+
+    def _get_joint_points(self, target_joint) -> tuple:
+        target_joint_name = list(target_joint.keys())[0]
+        joint = self._lookup_joints([target_joint_name])
+
+        target_x = target_joint[target_joint_name][0][0]
+        target_z = target_joint[target_joint_name][0][2]
+        real_x = joint[target_joint_name][0][0]
+        real_z = joint[target_joint_name][0][2]
+
+        return (target_x, target_z, real_x, real_z)
+
+    def _check_distance(self, target_joint:dict) -> float:
+        (center_x, center_z, point_x, point_z) = self._get_joint_points(
+            target_joint)
+        
+        return calculate_distance(center_x, center_z, point_x, point_z)
 
     def _lookup_joints(self, joints, ids=[0]) -> dict:
         """
@@ -91,13 +131,8 @@ class GestureDetector():
         trigger is published.
         """
 
-        target_joint_name = list(target_joint.keys())[0]
-        joint = self._lookup_joints([target_joint_name])
-
-        center_x = target_joint[target_joint_name][0][0]
-        center_z = target_joint[target_joint_name][0][2]
-        point_x = joint[target_joint_name][0][0]
-        point_z = joint[target_joint_name][0][2]
+        (center_x, center_z, point_x, point_z) = self._get_joint_points(
+            target_joint)
 
         if is_point_inside_circle(center_x, center_z, rad, point_x, point_z):
             print("In circle")
@@ -187,13 +222,26 @@ def pad_matrix(matrix) -> np.ndarray:
     return padded_matrix
 
 
-def is_point_inside_circle(center_x, center_y, rad, point_x, point_y) -> bool:
+def calculate_distance(p1_x:float, p1_y:float,
+                       p2_x:float, p2_y:float) -> tuple:
+    """
+    Calculates distance between 2 points.
+    """
+
+    distance_x:float = p2_x - p1_x
+    distance_y:float = p2_y - p1_y
+    distance:float = sqrt((distance_x) ** 2 + (distance_y) ** 2)
+    
+    return (distance_x, distance_y, distance)
+
+def is_point_inside_circle(center_x:float, center_y:float, rad:float,
+                           point_x:float, point_y:float) -> bool:
     """
     Calculates the distance between the 2 points and returns true if it's
     smaller than the radius of the circle.
     """
 
-    distance = sqrt((point_x - center_x) ** 2 + (point_y - center_y) ** 2)
+    (_, _, distance) = calculate_distance(center_x, center_y ,point_x, point_y)
 
     return distance <= rad
 
