@@ -48,16 +48,24 @@ class GestureDetector():
         self.treasure = self._load_joints('treasure.pkl')
         self.goal = self.treasure
 
-        # Distance check
+        # Set up distance check to goal
         duration = 2 # NOTE : shorter for debugging purpose
         self._timed_distance_checker(self.treasure, duration,
                                      self._distance_callback)
 
-    def _timed_distance_checker(self, target_joint, duration, callback):
+    def _timed_distance_checker(self, target_joint, duration, callback) -> None:
+        """
+        Sets up a timer that checks the distance to goal. Sets goal.
+        """
+
         self.goal = target_joint
         rospy.Timer(rospy.Duration(duration), callback)
 
-    def _distance_callback(self, _):
+    def _distance_callback(self, _) -> None:
+        """
+        Checks distance from goal.
+        """
+
         # Check distance from the treasure point
         (dist_x, dist_y, _) = self._check_distance(self.goal)
         if dist_x > 0.3:
@@ -123,7 +131,8 @@ class GestureDetector():
         jnts = self._lookup_joints(joints)
         pprint.pprint(jnts)
 
-    def _circle_trigger(self, target_joint:dict, trigger:str, rad:int=0.5):
+    def _circle_trigger(self, target_joint:dict, trigger:str,
+                        rad:int=0.5) -> None:
         """
         Sets up a circle trigger given a target joint around which the circle
         is set up using the radius. The joints name is used to look up the
@@ -247,21 +256,25 @@ def is_point_inside_circle(center_x:float, center_y:float, rad:float,
 
 
 """ TODO
-2. verify if angles are correct
+TODO verify if angles are correct
     -> testing
-3. publish triggers for positions and angles
+TODO angles publisher
     -> easy
-4. remake the threshold but with a rectangle not a line
+TODO remake the threshold but with a rectangle not a line
     -> easy
-6. other easy shapes ? (ellipse)
+TODO other easy shapes ? (ellipse)
     -> ask chat GPT
-7. threshold for 3D positions (+height) for lifting arm etc.
+TODO threshold for 3D positions (+height) for lifting arm etc.
     -> easy ?
-8. add basic gestures
+TODO add basic gestures & publisher
     -> time consuming, need another person
     -> T pose
     -> mains en air (1 our 2, G ou D)
-9. average of all points
+TODO average of all points
+
+TODO add multiple goals, goal switching
+TODO stop distance check publisher when at goal (?)
+
 
 """
 
