@@ -59,15 +59,14 @@ class GestureCreator():
         if key == 'e':
             self._exit()
 
-    def _lookup_joints(self, joints, ids=[0]) -> list:
-        result = []
+    def _lookup_joints(self, joints, ids=[0]) -> dict:
+        result = dict()
         for id in ids:
             for joint in joints:
                 joint_name = joint + "_" + str(id)
                 (tslt, rttn) = self.transform_listener.lookupTransform(
                     joint_name, self.root_frame, rospy.Time(0))
-                result.append((tslt, rttn))
-        # TODO : turn into dict and add joint names, translation, rotation
+                result[joint] = (tslt, rttn)
         return result
 
     def _save(self) -> None:
@@ -105,8 +104,8 @@ class GestureCreator():
             pickle.dump(joints, file)
         file.close()
 
-    def _load_joints(self, file_name = 'joints.pkl') -> list:
-        joints = []
+    def _load_joints(self, file_name = 'joints.pkl') -> dict:
+        joints = dict()
         with open(file_name, 'rb') as file:
             joints = pickle.load(file)
         file.close()
