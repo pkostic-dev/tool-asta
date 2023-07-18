@@ -108,7 +108,7 @@ class GestureDetector():
                 joint_name = joint + "_" + str(id)
                 (tslt, rttn) = self.transform_listener.lookupTransform(
                     joint_name, self.root_frame, rospy.Time(0))
-                result[joint] = (tslt, rttn)
+                result[joint] = [tslt, rttn]
         
         return result
     
@@ -276,6 +276,11 @@ TODO average of all points
 TODO add multiple goals, goal switching
 TODO stop distance check publisher when at goal (?)
 
+TODO : detect sequence of gestures
+    -> first detect initial gesture, set flag
+    -> set a timer
+    -> check if next gesture is validated
+    -> publish
 
 """
 
