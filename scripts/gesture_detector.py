@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 
-import pickle
 import time
-from math import degrees, sqrt
 import pprint
 
 import rospy
-import numpy as np
 
-from tf import TransformListener, transformations, LookupException, ConnectivityException, ExtrapolationException # type: ignore
+from tf import TransformListener, LookupException, ConnectivityException, ExtrapolationException # type: ignore
 from std_msgs.msg import String
 from save_manager import SaveManager
+from helper import calculate_angle, calculate_distances, is_point_inside_circle
 
 
 class GestureDetector():
@@ -48,7 +46,7 @@ class GestureDetector():
                        "right_elbow", "right_wrist", "right_hand",
                        "left_hip", "left_knee", "left_ankle",
                        "right_hip", "right_knee", "right_ankle"]
-        self.treasure = self.save_manager.load_pickle('treasure.pkl')
+        self.treasure = self.save_manager.load_pickle_to_dict('treasure.pkl')
         self.goal = self.treasure
         self.distance_timer:rospy.Timer
 
@@ -120,11 +118,12 @@ class GestureDetector():
         Calculates the angle of the joints in list. Returns degrees.
         """
 
-        # TODO update for dict (?)
         transformations = self._lookup_joints(joints)
-        orientations = [t[1] for t in transformations]
-        angle = calculate_angle(*orientations)
-        
+        rotations = []
+        for _, value in transformations.items():
+            rotation = value[1]
+            rotations.append(rotation)
+        angle = calculate_angle(*rotations)
         return angle
 
     def _get_joints(self, joints) -> None:
@@ -160,10 +159,10 @@ class GestureDetector():
 
         # all_joints = self._lookup_joints(self.joints)
         # print(all_joints)
-        # self._detect_angle(["left_wrist", "left_elbow", "left_shoulder"])
+        print(self._get_angle(["left_wrist", "left_elbow", "left_shoulder"]))
         # self._get_joints(["torso"])
 
-        self._circle_trigger(self.treasure, "treasure_found", 0.1)
+        #self._circle_trigger(self.treasure, "treasure_found", 0.1)
 
         self.rospy_rate.sleep()
 
@@ -181,70 +180,6 @@ class GestureDetector():
         except KeyboardInterrupt:
             rospy.signal_shutdown("KeyboardInterrupt")
             raise SystemExit
-
-
-# NOTE : Helper functions.
-
-def calculate_angle(pointA, vertex, pointB) -> float:
-    """
-    Calculates angle at vertex and returns the value in degrees.
-    """
-
-    r1 = transformations.quaternion_matrix(pointA)
-    r2 = transformations.quaternion_matrix(vertex)
-    r3 = transformations.quaternion_matrix(pointB)
-
-    relative_rotation = r2[:3, :3].T @ r1[:3, :3]
-    relative_rotation = pad_matrix(relative_rotation)
-
-    inverse_relative_rotation = r2[:3, :3].T @ r3[:3, :3]
-    inverse_relative_rotation = pad_matrix(inverse_relative_rotation)
-    
-    rotation_at_vertex = inverse_relative_rotation @ relative_rotation
-    rotation_at_vertex = pad_matrix(rotation_at_vertex)
-
-    rotation_quaternion = transformations.quaternion_from_matrix(
-        rotation_at_vertex)
-    angles = transformations.euler_from_quaternion(rotation_quaternion)
-    angle_at_vertex = angles[2]
-    angle_at_vertex_degrees = degrees(angle_at_vertex)
-
-    return angle_at_vertex_degrees
-
-
-def pad_matrix(matrix) -> np.ndarray:
-    """
-    Pad a 3x3 matrix with an extra row and column to make it 4x4.
-    """
-
-    padded_matrix = np.pad(matrix, ((0, 1), (0, 1)), mode='constant')
-    padded_matrix[3, 3] = 1.0
-
-    return padded_matrix
-
-
-def calculate_distances(p1_x:float, p1_y:float,
-                       p2_x:float, p2_y:float) -> tuple:
-    """
-    Calculates distance between 2 points.
-    """
-
-    distance_x:float = p2_x - p1_x
-    distance_y:float = p2_y - p1_y
-    distance:float = sqrt((distance_x) ** 2 + (distance_y) ** 2)
-    
-    return (distance_x, distance_y, distance)
-
-def is_point_inside_circle(center_x:float, center_y:float, rad:float,
-                           point_x:float, point_y:float) -> bool:
-    """
-    Calculates the distance between the 2 points and returns true if it's
-    smaller than the radius of the circle.
-    """
-
-    (_, _, distance) = calculate_distances(center_x, center_y ,point_x, point_y)
-
-    return distance <= rad
 
 
 """ TODO
