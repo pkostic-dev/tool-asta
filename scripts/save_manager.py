@@ -30,14 +30,17 @@ class SaveManager():
             return self.load_json(file_name)
         if extension == "csv":
             return self.load_csv(file_name)
+        self.file_not_found(file_name)
 
     def check_extension(self, file_name:str, extension:str) -> str:
         if not file_name:
             now = datetime.now()
             now_str = now.strftime("-%Y-%m-%d-%H-%M-%S")
             return "joints" + now_str + "." + extension
-        if file_name[-4:] != "." + extension:
+        file_extension = file_name.split(".")[-1]
+        if file_extension != extension:
             return file_name + "." + extension
+        return file_name
 
     def file_not_found(self, file_name) -> None:
         print("File not found : " + file_name)
@@ -76,31 +79,41 @@ class SaveManager():
         except FileNotFoundError:
             self.file_not_found(file_name)
     
-    def save_csv(self, joints:dict, file_name:str="joints.json") -> None:
+    def save_csv(self, joints:dict, file_name:str="joints.csv") -> None:
         file_name = self.check_extension(file_name, "csv")
         with open(file_name, "w", newline="") as file:
             writer = csv.writer(file)
-            writer.writerow(joints.keys())
-            for _, value in joints.items():
+            writer.writerow(['Joint', 'Translation', 'Rotation'])
+            # Write the values as data rows
+            for key, value in joints.items():
                 translation = json.dumps(value[0])
                 rotation = json.dumps(value[1])
-                writer.writerow([translation, rotation])
+                writer.writerow([key, translation, rotation])
 
     def load_csv(self, file_name:str="joints.csv") -> dict:
         try:
             file_name = self.check_extension(file_name, "csv")
-            joints:dict
+            joints = {}
             with open(file_name, "r", newline="") as file:
-                reader = csv.reader(file)
-                keys = next(reader)
+                reader = csv.DictReader(file)
                 for row in reader:
-                    translation = json.loads(row[0])
-                    rotation = json.loads(row[1])
-                    joints[keys[reader.line_num - 2]] = (translation, rotation)
+                    joint = row['Joint']
+                    translation = json.loads(row['Translation'])
+                    rotation = json.loads(row['Rotation'])
+                    joints[joint] = (translation, rotation)
             return joints
         except FileNotFoundError:
                 self.file_not_found(file_name)
 
 if __name__ == "__main__":
     SM = SaveManager()
-    SM.load_pickle("test")
+    
+    joints = {"test_joint" : ([0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4])}
+
+    SM.save_pickle(joints)
+    SM.save_json(joints)
+    SM.save_csv(joints)
+
+    print(SM.load_pickle("joints"))
+    print(SM.load_json("joints"))
+    print(SM.load_csv("joints"))
