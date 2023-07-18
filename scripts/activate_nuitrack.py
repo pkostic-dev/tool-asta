@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from PyNuitrack import py_nuitrack
+from PyNuitrack import py_nuitrack # type: ignore
 
 REALSENSE = "Intel RealSense"
 TRIAL = "Trial"
