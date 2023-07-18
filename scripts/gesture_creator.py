@@ -4,13 +4,13 @@ import termios
 import sys
 import select
 import tty
-import pickle
-from datetime import datetime
+import os
 
 import rospy
 import tf
 
 from save_manager import SaveManager
+from helper import calculate_angle
 
 
 def get_key(key_timeout):
@@ -53,12 +53,20 @@ class GestureCreator():
                             "right_elbow", "right_wrist", "right_hand",
                             "left_hip", "left_knee", "left_ankle",
                             "right_hip", "right_knee", "right_ankle"]
-        self.joints = ["torso"]
+        self.joints = ["torso", "head"]
+        self.angles = [["left_shoulder", "left_elbow", "left_wrist"],
+                       ["right_shoulder", "right_elbow", "right_wrist"]]
         self.format = "json"
-        self.commands = "[s] Save    [l] Load    [t] Toggle format    [e] Exit"
-        print("Saving/Loading format :", self.format)
-        print(self.commands)
+        self.commands = "[s] Save joints    [a] Save angles    [l] Load file    [t] Toggle format    [e] Exit"
+        self._print_commands()
     
+    def _print_commands(self):
+        print("Saving/Loading format :", self.format)
+        print("Joints list :", self.joints)
+        print("Angles list :", self.angles)
+        print("Commands : ")
+        print(self.commands)
+
     def _update(self) -> None:
         """
         Update loop. Checks for key presses.
@@ -66,7 +74,7 @@ class GestureCreator():
 
         key = get_key(0.1)
         if (len(key)):
-            print("Pressed key : " + key)
+            print("Pressed [", key, "]", sep="")
             self._keyboard_callback(key)
         self.rospy_rate.sleep()
 
@@ -76,7 +84,10 @@ class GestureCreator():
         """
 
         if key == 's' or key == 'S':
-            self._save()
+            self._save_joints()
+
+        if key == 'a' or key == 'A':
+            self._save_angles()
 
         if key == 'l' or key == 'L':
             self._load()
@@ -87,7 +98,7 @@ class GestureCreator():
         if key == 'e' or key == 'E':
             self._exit()
         
-        print(self.commands)
+        self._print_commands()
 
     def _lookup_joints(self, joints, ids=[0]) -> dict:
         """
@@ -105,28 +116,51 @@ class GestureCreator():
 
         return result
 
-    def _toggle_format(self) -> None:
-        if self.format == "json":
-            self.format = "csv"
-            print("Saving/Loading format :", self.format)
-        elif self.format == "csv":
-            self.format = "json"
-            print("Saving/Loading format :", self.format)
-
-    def _save(self) -> None:
+    def _get_angle(self, joints) -> float:
         """
-        Save sequence triggered by pressing 's'.
+        Calculates the angle of the joints in list. Returns degrees.
         """
 
-        print("Saving...")
+        transformations = self._lookup_joints(joints)
+        rotations = []
+        for _, value in transformations.items():
+            rotation = value[1]
+            rotations.append(rotation)
+        angle = calculate_angle(*rotations)
+        return angle
+
+    def _save_joints(self) -> None:
+        """
+        Joint saving sequence triggered by pressing 's'.
+        """
+
+        print("Saving joints", self.joints)
         joints = self._lookup_joints(self.joints)
         print("Enter the file name : ", end="")
         file_name = input()
         print("Saving to", file_name)
         if self.format == "json":
-            self.save_manager.save_json(joints, file_name)
+            self.save_manager.save_dict_to_json(joints, file_name)
         elif self.format == "csv":
-            self.save_manager.save_csv(joints, file_name)
+            self.save_manager.save_dict_to_csv(joints, file_name)
+
+    def _save_angles(self) -> None:
+        """
+        Angle saving sequence triggered by pressing 'a'.
+        """
+
+        print("Saving angles", self.angles)
+        angles = {}
+        for angle in self.angles:
+            # TODO : no loss of data, save angle[0] and angle[2] in dict
+            angles[angle[1]] = self._get_angle(angle)
+        print("Enter the file name : ", end="")
+        file_name = input()
+        print("Saving to", file_name)
+        if self.format == "json":
+            self.save_manager.save_dict_to_json(angles, file_name)
+        elif self.format == "csv":
+            self.save_manager.save_dict_to_csv(angles, file_name)
 
     def _load(self) -> None:
         """
@@ -138,12 +172,18 @@ class GestureCreator():
         print("Loading", file_name)
         joints = {}
         if self.format == "json":
-            joints = self.save_manager.load_json(file_name)
+            joints = self.save_manager.load_json_to_dict(file_name)
         if self.format == "csv":
-            joints = self.save_manager.load_csv(file_name)
+            joints = self.save_manager.load_csv_to_dict(file_name)
         if joints:
             print(joints)
-
+    
+    def _toggle_format(self) -> None:
+        if self.format == "json":
+            self.format = "csv"
+        elif self.format == "csv":
+            self.format = "json"
+    
     def _exit(self) -> None:
         """
         SystemExit triggered by pressing 'e'.
