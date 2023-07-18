@@ -5,9 +5,8 @@ from math import radians
 import rospy
 import numpy as np
 
-from tf import TransformBroadcaster
-from tf import transformations
-from PyNuitrack import py_nuitrack
+from tf import TransformBroadcaster, transformations
+from PyNuitrack import py_nuitrack # type: ignore
 
 
 class SkeletonConverter():
@@ -198,15 +197,16 @@ class SkeletonConverter():
                     )
                     self.last_translation[id_index, joint, :] = translation
 
-    def _check_similar_array(self, arr1, arr2):
+    def _check_similar_array(self, array1:np.ndarray, array2:np.ndarray,
+                             _decimals:int=5):
         """
-        Checks if two ndarrays have similar values up to the 5th digit after the decimal point.
+        Checks if two ndarrays have similar values up to the nth digit after the decimal point.
         """
 
-        rounded_arr1 = np.round(arr1, decimals=5)
-        rounded_arr2 = np.round(arr2, decimals=5)
+        rounded_array1 = np.round(array1, decimals=_decimals)
+        rounded_array2 = np.round(array2, decimals=_decimals)
 
-        return np.array_equal(rounded_arr1, rounded_arr2)
+        return np.array_equal(rounded_array1, rounded_array2)
 
     def _broadcast_nuitrack_frame(self) -> None:
         """Broadcasts the camera location tf."""
