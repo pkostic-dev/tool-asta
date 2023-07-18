@@ -10,7 +10,7 @@ from tf import transformations
 from PyNuitrack import py_nuitrack
 
 
-class SkeletonConverter:
+class SkeletonConverter():
     """Converts Nuitrack skeleton data into TF data and publishes it.
 
     This class initialises a Nuitrack object. Converts the data obtained from
