@@ -9,9 +9,10 @@ from datetime import datetime
 class SaveManager():
     """Allows for saving and loading joints in multiple different formats.
     
-    Formats : pickle, json, csv. Saves to and loads from working directory.
-    Saving and loading to csv only supports the original format with value 
-    for each key being a tuple containing one 3D array and one 4D array."""
+    Available formats : pickle, json, csv. Saves to and loads from
+    working directory. Saving and loading to csv only supports the
+    original format with value for each key being a tuple containing one
+    3D array and one 4D array."""
 
     def save_any(self, joints:dict, file_name:str) -> None:
         extension = file_name.split(".")[-1]
@@ -113,12 +114,17 @@ class SaveManager():
 if __name__ == "__main__":
     SM = SaveManager()
 
-    joints = {"test_joint" : [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4]]}
+    print("Test module ? (y/n) ", end="")
+    test = input()
+    if test == "y" or test == "Y":
+        joints = {"test_joint" : [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4]]}
 
-    SM.save_pickle(joints)
-    SM.save_json(joints)
-    SM.save_csv(joints)
+        SM.save_pickle(joints)
+        SM.save_json(joints)
+        SM.save_csv(joints)
 
-    assert(SM.load_pickle("joints") == joints)
-    assert(SM.load_json("joints") == joints)
-    assert(SM.load_csv("joints") == joints)
+        assert(SM.load_pickle("joints") == joints)
+        assert(SM.load_json("joints") == joints)
+        assert(SM.load_csv("joints") == joints)
+
+        print("All tests passed.")
