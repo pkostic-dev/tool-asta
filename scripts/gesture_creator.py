@@ -8,7 +8,7 @@ import pickle
 from datetime import datetime
 
 import rospy
-from tf import TransformListener, LookupException, ExtrapolationException, ConnectivityException
+import tf
 
 from save_manager import SaveManager
 
@@ -46,7 +46,7 @@ class GestureCreator():
         self.root_frame = "map" # NOTE : root frame, might have to change it
         update_frequency = 10.0  # NOTE : in Hz
         self.rospy_rate = rospy.Rate(update_frequency)
-        self.transform_listener = TransformListener()
+        self.transform_listener = tf.TransformListener()
         self.all_joints = [ "head", "neck", "torso", "waist", "left_collar",
                             "left_shoulder", "left_elbow", "left_wrist",
                             "left_hand", "right_collar", "right_shoulder",
@@ -54,9 +54,10 @@ class GestureCreator():
                             "left_hip", "left_knee", "left_ankle",
                             "right_hip", "right_knee", "right_ankle"]
         self.joints = ["torso"]
-
-        print("Usage :")
-        print("  [ Save : s ]    [ Load : l ]    [ Exit : e ]  ")
+        self.format = "json"
+        self.commands = "[s] Save    [l] Load    [t] Toggle format    [e] Exit"
+        print("Saving/Loading format :", self.format)
+        print(self.commands)
     
     def _update(self) -> None:
         """
@@ -80,8 +81,13 @@ class GestureCreator():
         if key == 'l' or key == 'L':
             self._load()
 
+        if key == 't' or key == 'T':
+            self._toggle_format()
+
         if key == 'e' or key == 'E':
             self._exit()
+        
+        print(self.commands)
 
     def _lookup_joints(self, joints, ids=[0]) -> dict:
         """
@@ -95,9 +101,17 @@ class GestureCreator():
                 joint_name = joint + "_" + str(id)
                 (tslt, rttn) = self.transform_listener.lookupTransform(
                     joint_name, self.root_frame, rospy.Time(0))
-                result[joint] = (tslt, rttn)
+                result[joint] = [tslt, rttn]
 
         return result
+
+    def _toggle_format(self) -> None:
+        if self.format == "json":
+            self.format = "csv"
+            print("Saving/Loading format :", self.format)
+        elif self.format == "csv":
+            self.format = "json"
+            print("Saving/Loading format :", self.format)
 
     def _save(self) -> None:
         """
@@ -109,18 +123,26 @@ class GestureCreator():
         print("Enter the file name : ", end="")
         file_name = input()
         print("Saving to", file_name)
-        self.save_manager.save_pickle(joints, file_name)
+        if self.format == "json":
+            self.save_manager.save_json(joints, file_name)
+        elif self.format == "csv":
+            self.save_manager.save_csv(joints, file_name)
 
     def _load(self) -> None:
         """
         Load sequence triggered by pressing 'l'.
         """
 
-        print("Loading...")
         print("Enter the file name : ", end='')
         file_name = input()
         print("Loading", file_name)
-        print(self.save_manager.load_pickle(file_name))
+        joints = {}
+        if self.format == "json":
+            joints = self.save_manager.load_json(file_name)
+        if self.format == "csv":
+            joints = self.save_manager.load_csv(file_name)
+        if joints:
+            print(joints)
 
     def _exit(self) -> None:
         """
@@ -138,9 +160,9 @@ class GestureCreator():
         while not rospy.is_shutdown():
             try:
                 self._update()
-            except (LookupException,
-                ConnectivityException,
-                ExtrapolationException) as exception:
+            except (tf.LookupException,
+                tf.ConnectivityException,
+                tf.ExtrapolationException) as exception:
                 pass
             except KeyboardInterrupt:
                 rospy.signal_shutdown("KeyboardInterrupt")
