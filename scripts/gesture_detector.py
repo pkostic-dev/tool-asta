@@ -47,6 +47,7 @@ class GestureDetector():
                        "right_hip", "right_knee", "right_ankle"]
         self.treasure = self._load_joints('treasure.pkl')
         self.goal = self.treasure
+        self.distance_timer:rospy.Timer
 
         # Set up distance check to goal
         duration = 2 # NOTE : shorter for debugging purpose
@@ -59,7 +60,7 @@ class GestureDetector():
         """
 
         self.goal = target_joint
-        rospy.Timer(rospy.Duration(duration), callback)
+        self.distance_timer = rospy.Timer(rospy.Duration(duration), callback)
 
     def _distance_callback(self, _) -> None:
         """
@@ -93,7 +94,7 @@ class GestureDetector():
         (center_x, center_z, point_x, point_z) = self._get_joint_points(
             target_joint)
         
-        return calculate_distance(center_x, center_z, point_x, point_z)
+        return calculate_distances(center_x, center_z, point_x, point_z)
 
     def _lookup_joints(self, joints, ids=[0]) -> dict:
         """
@@ -116,7 +117,7 @@ class GestureDetector():
         Calculates the angle of the joints in list. Returns degrees.
         """
 
-        # TODO update for dict
+        # TODO update for dict (?)
         transformations = self._lookup_joints(joints)
         orientations = [t[1] for t in transformations]
         angle = calculate_angle(*orientations)
@@ -231,7 +232,7 @@ def pad_matrix(matrix) -> np.ndarray:
     return padded_matrix
 
 
-def calculate_distance(p1_x:float, p1_y:float,
+def calculate_distances(p1_x:float, p1_y:float,
                        p2_x:float, p2_y:float) -> tuple:
     """
     Calculates distance between 2 points.
@@ -250,7 +251,7 @@ def is_point_inside_circle(center_x:float, center_y:float, rad:float,
     smaller than the radius of the circle.
     """
 
-    (_, _, distance) = calculate_distance(center_x, center_y ,point_x, point_y)
+    (_, _, distance) = calculate_distances(center_x, center_y ,point_x, point_y)
 
     return distance <= rad
 
