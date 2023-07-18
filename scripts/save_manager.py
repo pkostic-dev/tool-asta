@@ -31,6 +31,7 @@ class SaveManager():
         if extension == "csv":
             return self.load_csv(file_name)
         self.file_not_found(file_name)
+        return {}
 
     def check_extension(self, file_name:str, extension:str) -> str:
         if not file_name:
@@ -63,6 +64,7 @@ class SaveManager():
             return joints
         except FileNotFoundError:
             self.file_not_found(file_name)
+            return {}
     
     def save_json(self, joints:dict, file_name:str="joints.json") -> None:
         file_name = self.check_extension(file_name, "json")
@@ -78,6 +80,7 @@ class SaveManager():
             return joints
         except FileNotFoundError:
             self.file_not_found(file_name)
+            return {}
     
     def save_csv(self, joints:dict, file_name:str="joints.csv") -> None:
         file_name = self.check_extension(file_name, "csv")
@@ -100,20 +103,22 @@ class SaveManager():
                     joint = row['Joint']
                     translation = json.loads(row['Translation'])
                     rotation = json.loads(row['Rotation'])
-                    joints[joint] = (translation, rotation)
+                    joints[joint] = [translation, rotation]
             return joints
         except FileNotFoundError:
                 self.file_not_found(file_name)
+                return {}
+
 
 if __name__ == "__main__":
     SM = SaveManager()
-    
-    joints = {"test_joint" : ([0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4])}
+
+    joints = {"test_joint" : [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4]]}
 
     SM.save_pickle(joints)
     SM.save_json(joints)
     SM.save_csv(joints)
 
-    print(SM.load_pickle("joints"))
-    print(SM.load_json("joints"))
-    print(SM.load_csv("joints"))
+    assert(SM.load_pickle("joints") == joints)
+    assert(SM.load_json("joints") == joints)
+    assert(SM.load_csv("joints") == joints)
