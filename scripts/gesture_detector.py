@@ -8,8 +8,9 @@ import pprint
 import rospy
 import numpy as np
 
-from tf import TransformListener, LookupException, ExtrapolationException, ConnectivityException, transformations
+from tf import TransformListener, transformations, LookupException, ConnectivityException, ExtrapolationException # type: ignore
 from std_msgs.msg import String
+from save_manager import SaveManager
 
 
 class GestureDetector():
@@ -21,6 +22,8 @@ class GestureDetector():
     def __init__(self) -> None:
         super().__init__()
         rospy.init_node("gesture_detector", anonymous=True)
+
+        self.save_manager = SaveManager()
 
         # Publisher of human gestures
         self.human_gesture_publisher = rospy.Publisher(
@@ -45,7 +48,7 @@ class GestureDetector():
                        "right_elbow", "right_wrist", "right_hand",
                        "left_hip", "left_knee", "left_ankle",
                        "right_hip", "right_knee", "right_ankle"]
-        self.treasure = self._load_joints('treasure.pkl')
+        self.treasure = self.save_manager.load_pickle('treasure.pkl')
         self.goal = self.treasure
         self.distance_timer:rospy.Timer
 
@@ -90,10 +93,10 @@ class GestureDetector():
 
         return (target_x, target_z, real_x, real_z)
 
-    def _check_distance(self, target_joint:dict) -> float:
+    def _check_distance(self, target_joint:dict) -> tuple:
         (center_x, center_z, point_x, point_z) = self._get_joint_points(
             target_joint)
-        
+
         return calculate_distances(center_x, center_z, point_x, point_z)
 
     def _lookup_joints(self, joints, ids=[0]) -> dict:
@@ -133,7 +136,7 @@ class GestureDetector():
         pprint.pprint(jnts)
 
     def _circle_trigger(self, target_joint:dict, trigger:str,
-                        rad:int=0.5) -> None:
+                        rad:float=0.5) -> None:
         """
         Sets up a circle trigger given a target joint around which the circle
         is set up using the radius. The joints name is used to look up the
@@ -147,18 +150,6 @@ class GestureDetector():
         if is_point_inside_circle(center_x, center_z, rad, point_x, point_z):
             print("In circle")
             self.human_gesture_publisher.publish(trigger)
-
-    def _load_joints(self, file_name = 'joints.pkl') -> dict:
-        """
-        Loads joints stored in file and returns as dictionary.
-        """
-
-        joints = dict()
-        with open(file_name, 'rb') as file:
-            joints = pickle.load(file)
-        file.close()
-        
-        return joints
 
     def _update(self) -> None:
         """
