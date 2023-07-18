@@ -17,20 +17,20 @@ class SaveManager():
     def save_any(self, joints:dict, file_name:str) -> None:
         extension = file_name.split(".")[-1]
         if extension == "pkl":
-            self.save_pickle(joints, file_name)
+            self.save_dict_to_pickle(joints, file_name)
         if extension == "json":
-            self.save_json(joints, file_name)
+            self.save_dict_to_json(joints, file_name)
         if extension == "csv":
-            self.save_csv(joints, file_name)
+            self.save_dict_to_csv(joints, file_name)
 
     def load_any(self, file_name:str) -> dict:
         extension = file_name.split(".")[-1]
         if extension == "pkl":
-            return self.load_pickle(file_name)
+            return self.load_pickle_to_dict(file_name)
         if extension == "json":
-            return self.load_json(file_name)
+            return self.load_json_to_dict(file_name)
         if extension == "csv":
-            return self.load_csv(file_name)
+            return self.load_csv_to_dict(file_name)
         self.file_not_found(file_name)
         return {}
 
@@ -51,39 +51,42 @@ class SaveManager():
         for f in files_list:
             print("\t", f)
 
-    def save_pickle(self, joints:dict, file_name:str="joints.pkl") -> None:
+    def save_dict_to_pickle(self, data:dict, file_name:str="data.pkl") -> None:
         file_name = self.check_extension(file_name, "pkl")
         with open(file_name, "wb") as file:
-            pickle.dump(joints, file)
+            pickle.dump(data, file)
 
-    def load_pickle(self, file_name:str="joints.pkl") -> dict:
+    def load_pickle_to_dict(self, file_name:str="data.pkl") -> dict:
         try:
             file_name = self.check_extension(file_name, "pkl")
-            joints:dict
+            data:dict
             with open(file_name, "rb") as file:
-                joints = pickle.load(file)
-            return joints
+                data = pickle.load(file)
+            return data
         except FileNotFoundError:
             self.file_not_found(file_name)
             return {}
     
-    def save_json(self, joints:dict, file_name:str="joints.json") -> None:
+    def save_dict_to_json(self, data:dict, file_name:str="data.json") -> None:
+        # NOTE : tuple is transformed into list
         file_name = self.check_extension(file_name, "json")
         with open(file_name, "w") as file:
-            json.dump(joints, file)
+            json.dump(data, file)
 
-    def load_json(self, file_name:str="joints.json") -> dict:
+    def load_json_to_dict(self, file_name:str="data.json") -> dict:
         try:
             file_name = self.check_extension(file_name, "json")
-            joints:dict
+            data:dict
             with open(file_name, "r") as file:
-                joints = json.load(file)
-            return joints
+                data = json.load(file)
+            return data
         except FileNotFoundError:
             self.file_not_found(file_name)
             return {}
     
-    def save_csv(self, joints:dict, file_name:str="joints.csv") -> None:
+    # NOTE : csv functions only work for joints for now
+    # TODO : add angles support
+    def save_dict_to_csv(self, joints:dict, file_name:str="joints.csv") -> None:
         file_name = self.check_extension(file_name, "csv")
         with open(file_name, "w", newline="") as file:
             writer = csv.writer(file)
@@ -94,7 +97,7 @@ class SaveManager():
                 rotation = json.dumps(value[1])
                 writer.writerow([key, translation, rotation])
 
-    def load_csv(self, file_name:str="joints.csv") -> dict:
+    def load_csv_to_dict(self, file_name:str="joints.csv") -> dict:
         try:
             file_name = self.check_extension(file_name, "csv")
             joints = {}
@@ -119,12 +122,12 @@ if __name__ == "__main__":
     if test == "y" or test == "Y":
         joints = {"test_joint" : [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4]]}
 
-        SM.save_pickle(joints)
-        SM.save_json(joints)
-        SM.save_csv(joints)
+        SM.save_dict_to_pickle(joints)
+        SM.save_dict_to_json(joints)
+        SM.save_dict_to_csv(joints)
 
-        assert(SM.load_pickle("joints") == joints)
-        assert(SM.load_json("joints") == joints)
-        assert(SM.load_csv("joints") == joints)
+        assert(SM.load_pickle_to_dict("joints") == joints)
+        assert(SM.load_json_to_dict("joints") == joints)
+        assert(SM.load_csv_to_dict("joints") == joints)
 
         print("All tests passed.")
