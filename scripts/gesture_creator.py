@@ -10,6 +10,8 @@ from datetime import datetime
 import rospy
 from tf import TransformListener, LookupException, ExtrapolationException, ConnectivityException
 
+from save_manager import SaveManager
+
 
 def get_key(key_timeout):
     """
@@ -39,6 +41,7 @@ class GestureCreator():
     def __init__(self) -> None:
         super().__init__()
 
+        self.save_manager = SaveManager()
         rospy.init_node("gesture_creator", anonymous=True)
         self.root_frame = "map" # NOTE : root frame, might have to change it
         update_frequency = 10.0  # NOTE : in Hz
@@ -103,19 +106,10 @@ class GestureCreator():
 
         print("Saving...")
         joints = self._lookup_joints(self.joints)
-
         print("Enter the file name : ", end="")
         file_name = input()
-        if not file_name:
-            now = datetime.now()
-            now_str = now.strftime("-%Y-%m-%d-%H-%M-%S")
-            file_name = 'joints' + now_str
-        if file_name[-4:] != '.pkl':
-            file_name += '.pkl'
-
         print("Saving to", file_name)
-
-        self._save_joints(joints, file_name)
+        self.save_manager.save_pickle(joints, file_name)
 
     def _load(self) -> None:
         """
@@ -125,10 +119,8 @@ class GestureCreator():
         print("Loading...")
         print("Enter the file name : ", end='')
         file_name = input()
-        if file_name[-4:] != '.pkl':
-            file_name += '.pkl'
         print("Loading", file_name)
-        print(self._load_joints(file_name))
+        print(self.save_manager.load_pickle(file_name))
 
     def _exit(self) -> None:
         """
@@ -137,28 +129,6 @@ class GestureCreator():
 
         print("Exiting...")
         raise SystemExit
-
-    def _save_joints(self, joints, file_name) -> None:
-        """
-        Save joints to a file given a file_name. Saves to working directory.
-        """
-
-        with open(file_name, 'wb') as file:
-            pickle.dump(joints, file)
-        file.close()
-
-    def _load_joints(self, file_name = 'joints.pkl') -> dict:
-        """
-        Loads file containing joints given a file name. Loads from working
-        directory.
-        """
-
-        joints = dict()
-        with open(file_name, 'rb') as file:
-            joints = pickle.load(file)
-        file.close()
-
-        return joints
 
     def launch(self) -> None:
         """
@@ -172,8 +142,6 @@ class GestureCreator():
                 ConnectivityException,
                 ExtrapolationException) as exception:
                 pass
-            except FileNotFoundError:
-                print("File not found.")
             except KeyboardInterrupt:
                 rospy.signal_shutdown("KeyboardInterrupt")
                 raise SystemExit
