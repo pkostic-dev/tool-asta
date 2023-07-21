@@ -8,7 +8,7 @@ import rospy
 from tf import TransformListener, LookupException, ConnectivityException, ExtrapolationException # type: ignore
 from std_msgs.msg import String
 from save_manager import SaveManager
-from helper import calculate_angle, calculate_distances, is_point_inside_circle
+from helper import calculate_degrees, calculate_distances, is_point_inside_circle
 
 
 class GestureDetector():
@@ -123,7 +123,7 @@ class GestureDetector():
         for _, value in transformations.items():
             rotation = value[1]
             rotations.append(rotation)
-        angle = calculate_angle(*rotations)
+        angle = calculate_degrees(*rotations)
         return angle
 
     def _get_joints(self, joints) -> None:
