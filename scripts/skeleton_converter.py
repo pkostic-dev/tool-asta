@@ -153,6 +153,7 @@ class SkeletonConverter():
             self._broadcast_nuitrack_frame()
 
             # Broadcast transform message for each joint
+            msg = str(rospy.Time.now()) + " "
             for joint in range(self.nb_joints):
                 # Rotation to euler
                 rotations = self.rotation[id_index, joint, :]
@@ -188,15 +189,16 @@ class SkeletonConverter():
                 #        for very similar translations and don't publish
                 #        them.
                 if ((confidence > 0.5) and not similar):
-                    msg = "[{time}] {child}({conf}) = {tsl} {rot}"
+                    # msg = "[{time}] {child}({conf}) = {tsl} {rot}"
 
-                    print(msg.format(time=time, child=child, conf=confidence,
-                        tsl=translation, rot=rotation))
+                    # print(msg.format(time=time, child=child, conf=confidence,
+                    #     tsl=translation, rot=rotation))
+                    msg += child + ", "
                     self.transform_broadcaster.sendTransform(
                         translation, rotation, time, child, parent
                     )
                     self.last_translation[id_index, joint, :] = translation
-
+            print(msg)
     def _check_similar_array(self, array1:np.ndarray, array2:np.ndarray,
                              _decimals:int=5):
         """
