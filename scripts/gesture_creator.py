@@ -43,9 +43,10 @@ class GestureCreator():
 
         self.save_manager = SaveManager()
         rospy.init_node("gesture_creator", anonymous=True)
-        self.root_frame = "map" # NOTE : root frame, might have to change it
-        update_frequency = 10.0  # NOTE : in Hz
-        self.rospy_rate = rospy.Rate(update_frequency)
+        # self.root_frame is set to the default root frame in ROS : "map"
+        self.root_frame = "map"
+        hz_rate = 10.0
+        self.rospy_rate = rospy.Rate(hz_rate)
         self.transform_listener = tf.TransformListener()
         self.all_joints = [ "head", "neck", "torso", "waist", "left_collar",
                             "left_shoulder", "left_elbow", "left_wrist",
@@ -53,21 +54,30 @@ class GestureCreator():
                             "right_elbow", "right_wrist", "right_hand",
                             "left_hip", "left_knee", "left_ankle",
                             "right_hip", "right_knee", "right_ankle"]
-        self.joints = ["torso", "head"]
+        self.formats = ["json", "csv", "pickle"]
+        self.format = 0
+
+        self.joints = ["torso", "head"] # used for saving joints
         l_elbow_angle = ["left_shoulder", "left_elbow", "left_wrist"]
         r_elbow_angle = ["right_shoulder", "right_elbow", "right_wrist"]
-        self.joint_angles = [l_elbow_angle, r_elbow_angle]
-        self.format = "json"
-        self.commands = "[s] Save joints    [a] Save angles    [l] Load file    [t] Toggle format    [e] Exit"
+        self.joint_angles = [l_elbow_angle, r_elbow_angle] # for saving angles
+        
+        self.commands = {"s": "Save joints", "a": "Save angles", 
+                         "l": "Load file", "c": "Change format", "e": "Exit"}
         self._print_commands()
     
     def _print_commands(self):
         print()
-        print("Saving/Loading format :", self.format)
+        print("Saving/Loading format :", self.formats[self.format])
         print("Joints list :", self.joints)
         print("Angles list :", self.joint_angles)
         print("Commands : ")
-        print(self.commands)
+        msg = ""
+        for key in self.commands:
+            command = self.commands[key]
+            msg += "[{key}] {command}".format(key=key, command=command)
+            msg += "    "
+        print(msg)
 
     def _update(self) -> None:
         """
@@ -84,18 +94,18 @@ class GestureCreator():
         """
         Execute functions based on key pressed.
         """
-
+        # FIXME: couple with self.commands
         if key == 's' or key == 'S':
-            self._save_joints()
+            self._save_joints(self.joints)
 
         if key == 'a' or key == 'A':
-            self._save_angles()
+            self._save_angles(self.joint_angles)
 
         if key == 'l' or key == 'L':
             self._load()
 
-        if key == 't' or key == 'T':
-            self._toggle_format()
+        if key == 'c' or key == 'C':
+            self._change_format()
 
         if key == 'e' or key == 'E':
             self._exit()
@@ -135,42 +145,48 @@ class GestureCreator():
 
         return result
 
-    def _save_joints(self) -> None:
+    def _save_joints(self, joints) -> None:
         """
         Joint saving sequence triggered by pressing 's'.
         """
 
-        print("Saving joints", self.joints)
-        joints = self._lookup_joints(self.joints)
+        print("Saving joints", joints)
+        transformations = self._lookup_joints(joints)
         print("Enter the file name : ", end="")
         file_name = input()
         print("Saving to", file_name)
-        if self.format == "json":
-            print(type(next(iter(joints.values()))))
-            self.save_manager.save_dict_to_json(joints, file_name)
-        elif self.format == "csv":
-            self.save_manager.save_dict_to_csv(joints, file_name)
+        if self.formats[self.format] == "json":
+            self.save_manager.save_dict_to_json(transformations, file_name)
+        elif self.formats[self.format] == "csv":
+            self.save_manager.save_dict_to_csv(transformations, file_name)
+        elif self.formats[self.format] == "pickle":
+            self.save_manager.save_dict_to_pickle(transformations, file_name)
+        else:
+            self.save_manager.save_any(transformations, file_name)
 
-    def _save_angles(self) -> None:
+    def _save_angles(self, angles) -> None:
         """
         Angle saving sequence triggered by pressing 'a'.
         """
 
-        print("Saving angles", self.joint_angles)
+        print("Saving angles", angles)
 
         calculated_angles = {}
-        for joint_angle in self.joint_angles:
+        for joint_angle in angles:
             vertex = joint_angle[1]
             calculated_angles[vertex] = self._get_angle(joint_angle)
 
         print("Enter the file name : ", end="")
         file_name = input()
         print("Saving to", file_name)
-        if self.format == "json":
-            print(type(next(iter(calculated_angles.values()))))
+        if self.formats[self.format] == "json":
             self.save_manager.save_dict_to_json(calculated_angles, file_name)
-        elif self.format == "csv":
+        elif self.formats[self.format] == "csv":
             self.save_manager.save_dict_to_csv(calculated_angles, file_name)
+        elif self.formats[self.format] == "pickle":
+            self.save_manager.save_dict_to_pickle(calculated_angles, file_name)
+        else:
+            self.save_manager.save_any(calculated_angles, file_name)
 
     def _load(self) -> None:
         """
@@ -180,19 +196,23 @@ class GestureCreator():
         print("Enter the file name : ", end='')
         file_name = input()
         print("Loading", file_name)
-        joints = {}
-        if self.format == "json":
-            joints = self.save_manager.load_json_to_dict(file_name)
-        if self.format == "csv":
-            joints = self.save_manager.load_csv_to_dict(file_name)
-        if joints:
-            print(joints)
+        data = {}
+        if self.formats[self.format] == "json":
+            data = self.save_manager.load_json_to_dict(file_name)
+        elif self.formats[self.format] == "csv":
+            data = self.save_manager.load_csv_to_dict(file_name)
+        elif self.formats[self.format] == "pickle":
+            data = self.save_manager.load_pickle_to_dict(file_name)
+        else:
+            data = self.save_manager.load_any(file_name)
+        if data:
+            print(data)
     
-    def _toggle_format(self) -> None:
-        if self.format == "json":
-            self.format = "csv"
-        elif self.format == "csv":
-            self.format = "json"
+    def _change_format(self) -> None:
+        if self.format + 1 <= len(self.formats) - 1:
+            self.format += 1
+        else:
+            self.format = 0
     
     def _exit(self) -> None:
         """
