@@ -10,7 +10,7 @@ import rospy
 import tf
 
 from save_manager import SaveManager
-from helper import calculate_angle
+from helper import calculate_degrees
 
 
 def get_key(key_timeout):
@@ -54,16 +54,18 @@ class GestureCreator():
                             "left_hip", "left_knee", "left_ankle",
                             "right_hip", "right_knee", "right_ankle"]
         self.joints = ["torso", "head"]
-        self.angles = [["left_shoulder", "left_elbow", "left_wrist"],
-                       ["right_shoulder", "right_elbow", "right_wrist"]]
+        l_elbow_angle = ["left_shoulder", "left_elbow", "left_wrist"]
+        r_elbow_angle = ["right_shoulder", "right_elbow", "right_wrist"]
+        self.joint_angles = [l_elbow_angle, r_elbow_angle]
         self.format = "json"
         self.commands = "[s] Save joints    [a] Save angles    [l] Load file    [t] Toggle format    [e] Exit"
         self._print_commands()
     
     def _print_commands(self):
+        print()
         print("Saving/Loading format :", self.format)
         print("Joints list :", self.joints)
-        print("Angles list :", self.angles)
+        print("Angles list :", self.joint_angles)
         print("Commands : ")
         print(self.commands)
 
@@ -116,18 +118,22 @@ class GestureCreator():
 
         return result
 
-    def _get_angle(self, joints) -> float:
+    def _get_angle(self, joints) -> dict:
         """
         Calculates the angle of the joints in list. Returns degrees.
         """
-
+        
+        result = {}
         transformations = self._lookup_joints(joints)
+        result["joints"] = transformations
         rotations = []
         for _, value in transformations.items():
             rotation = value[1]
             rotations.append(rotation)
-        angle = calculate_angle(*rotations)
-        return angle
+        degrees = calculate_degrees(*rotations)
+        result["degrees"] = degrees
+
+        return result
 
     def _save_joints(self) -> None:
         """
@@ -140,6 +146,7 @@ class GestureCreator():
         file_name = input()
         print("Saving to", file_name)
         if self.format == "json":
+            print(type(next(iter(joints.values()))))
             self.save_manager.save_dict_to_json(joints, file_name)
         elif self.format == "csv":
             self.save_manager.save_dict_to_csv(joints, file_name)
@@ -149,18 +156,21 @@ class GestureCreator():
         Angle saving sequence triggered by pressing 'a'.
         """
 
-        print("Saving angles", self.angles)
-        angles = {}
-        for angle in self.angles:
-            # TODO : no loss of data, save angle[0] and angle[2] in dict
-            angles[angle[1]] = self._get_angle(angle)
+        print("Saving angles", self.joint_angles)
+
+        calculated_angles = {}
+        for joint_angle in self.joint_angles:
+            vertex = joint_angle[1]
+            calculated_angles[vertex] = self._get_angle(joint_angle)
+
         print("Enter the file name : ", end="")
         file_name = input()
         print("Saving to", file_name)
         if self.format == "json":
-            self.save_manager.save_dict_to_json(angles, file_name)
+            print(type(next(iter(calculated_angles.values()))))
+            self.save_manager.save_dict_to_json(calculated_angles, file_name)
         elif self.format == "csv":
-            self.save_manager.save_dict_to_csv(angles, file_name)
+            self.save_manager.save_dict_to_csv(calculated_angles, file_name)
 
     def _load(self) -> None:
         """

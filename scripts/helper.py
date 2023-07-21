@@ -7,7 +7,7 @@ import numpy as np
 from tf import transformations
 
 
-def calculate_angle(pointA, vertex, pointB) -> float:
+def calculate_degrees(pointA, vertex, pointB) -> float:
     """
     Calculates angle at vertex and returns the value in degrees.
     """
