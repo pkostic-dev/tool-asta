@@ -98,7 +98,6 @@ class SaveManager():
                     rotation = json.dumps(value[1])
                     writer.writerow([key, translation, rotation])
             elif isinstance(first_element_type, dict):
-                # TODO : doesn't work, fix this
                 joint_keys = [key for key in next(
                     iter(data.values()))['joints']]
                 writer.writerow(['JointKeys', 'JointA', 'JointVertex',
@@ -117,6 +116,7 @@ class SaveManager():
                 reader = csv.DictReader(file)
                 fieldnames = reader.fieldnames
                 columns = 0
+                # NOTE : fieldnames contains Sequence | None so need to check
                 if fieldnames:
                     columns = len(fieldnames)
                 if columns == 3:
@@ -127,7 +127,7 @@ class SaveManager():
                         data[joint] = [translation, rotation]
                 if columns == 5:
                     for row in reader:
-                        # NOTE : json.loads doesn't like quotes
+                        # NOTE: json.loads doesn't like quotes
                         joint_keys = row['JointKeys'].replace("'", "~")
                         joint_keys = row['JointKeys'].replace('"', "'")
                         joint_keys = row['JointKeys'].replace("'", '"')
