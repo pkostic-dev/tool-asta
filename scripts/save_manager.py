@@ -39,7 +39,7 @@ class SaveManager():
         if not file_name:
             now = datetime.now()
             now_str = now.strftime("-%Y-%m-%d-%H-%M-%S")
-            return "joints" + now_str + "." + extension
+            return "data" + now_str + "." + extension
         file_extension = file_name.split(".")[-1]
         if file_extension != extension:
             return file_name + "." + extension
@@ -89,20 +89,19 @@ class SaveManager():
         file_name = self.check_extension(file_name, "csv")
         with open(file_name, "w", newline="") as file:
             writer = csv.writer(file)
-            first_element_type = next(iter(data.values()))
-            if isinstance(first_element_type, list):
+            first_element = next(iter(data.values()))
+            if isinstance(first_element, list):
                 writer.writerow(['Joint', 'Translation', 'Rotation'])
                 # Write the values as data rows
                 for key, value in data.items():
                     translation = json.dumps(value[0])
                     rotation = json.dumps(value[1])
                     writer.writerow([key, translation, rotation])
-            elif isinstance(first_element_type, dict):
-                joint_keys = [key for key in next(
-                    iter(data.values()))['joints']]
+            elif isinstance(first_element, dict):
                 writer.writerow(['JointKeys', 'JointA', 'JointVertex',
                                  'JointB', 'Degrees'])
                 for item in data.values():
+                    joint_keys = list(item['joints'].keys())
                     joint_values = [json.dumps(item['joints'][key])
                                     for key in joint_keys]
                     degrees = item['degrees']
@@ -162,6 +161,15 @@ if __name__ == "__main__":
                     "joint_a" : [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4]],
                     "vertex" : [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4]],
                     "joint_b" : [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4]],
+                },
+                'degrees' : 90.0
+            },
+            "vertex2" : {
+                "joint_keys" : ["joint_a2", "vertex2", "joint_b2"],
+                "joints" : {
+                    "joint_a2" : [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4]],
+                    "vertex2" : [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4]],
+                    "joint_b2" : [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4]],
                 },
                 'degrees' : 90.0
             }
