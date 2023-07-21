@@ -119,22 +119,29 @@ class GestureCreator():
         """
 
         result = dict()
-        for id in ids:
-            for joint in joints:
-                joint_name = joint + "_" + str(id)
-                (tslt, rttn) = self.transform_listener.lookupTransform(
-                    joint_name, self.root_frame, rospy.Time(0))
-                result[joint] = [tslt, rttn]
+        try:
+            for id in ids:
+                for joint in joints:
+                    joint_name = joint + "_" + str(id)
+                    (tslt, rttn) = self.transform_listener.lookupTransform(
+                        joint_name, self.root_frame, rospy.Time(0))
+                    result[joint] = [tslt, rttn]
+        except (tf.LookupException,
+                tf.ConnectivityException,
+                tf.ExtrapolationException) as exception:
+                print(exception)
 
         return result
 
     def _get_angle(self, joints) -> dict:
         """
-        Calculates the angle of the joints in list. Returns degrees.
+        Calculates the angle of the joints in list. Returns a dictionary
+        that contains joint keys, list of joints, and angle in degrees. 
         """
         
         result = {}
         transformations = self._lookup_joints(joints)
+        result["joint_keys"] = list(transformations.keys())
         result["joints"] = transformations
         rotations = []
         for _, value in transformations.items():
@@ -152,6 +159,9 @@ class GestureCreator():
 
         print("Saving joints", joints)
         transformations = self._lookup_joints(joints)
+        if not transformations:
+            print("Couldn't look up joints.")
+            return
         print("Enter the file name : ", end="")
         file_name = input()
         print("Saving to", file_name)
@@ -230,10 +240,6 @@ class GestureCreator():
         while not rospy.is_shutdown():
             try:
                 self._update()
-            except (tf.LookupException,
-                tf.ConnectivityException,
-                tf.ExtrapolationException) as exception:
-                pass
             except KeyboardInterrupt:
                 rospy.signal_shutdown("KeyboardInterrupt")
                 raise SystemExit
