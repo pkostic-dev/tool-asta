@@ -46,11 +46,12 @@ class GestureDetector():
                        "right_elbow", "right_wrist", "right_hand",
                        "left_hip", "left_knee", "left_ankle",
                        "right_hip", "right_knee", "right_ankle"]
+        
         self.treasure = self.save_manager.load_pickle_to_dict('treasure.pkl')
         self.goal = self.treasure
-        self.distance_timer:rospy.Timer
-
+        
         # Set up distance check to goal
+        self.distance_timer:rospy.Timer
         duration = 2 # NOTE : shorter for debugging purpose
         self._timed_distance_checker(self.treasure, duration,
                                      self._distance_callback)
