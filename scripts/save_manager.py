@@ -6,6 +6,7 @@ import csv
 import os
 from datetime import datetime
 
+from helper import print_green, print_red
 
 class SaveManager():
     """Allows for saving and loading joints in multiple different formats.
@@ -46,7 +47,7 @@ class SaveManager():
         return file_name
 
     def file_not_found(self, file_name) -> None:
-        print("File not found : " + file_name)
+        print_red("File not found : " + file_name)
         print("Files in working directory : ")
         files_list = list(filter(os.path.isfile, os.listdir(".")))
         for f in files_list:
@@ -191,4 +192,4 @@ if __name__ == "__main__":
         assert (SM.load_json_to_dict("angles") == angles)
         assert (SM.load_csv_to_dict("angles") == angles)
 
-        print("All tests passed.")
+        print_green("All tests passed.")
