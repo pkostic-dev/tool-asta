@@ -8,7 +8,7 @@ import rospy
 from tf import TransformListener, LookupException, ConnectivityException, ExtrapolationException # type: ignore
 from std_msgs.msg import String
 from save_manager import SaveManager
-from helper import calculate_degrees, calculate_distances, is_point_inside_circle
+from helper import calculate_degrees, calculate_distances, is_point_inside_circle, translation_average, print_red, print_green
 
 
 class GestureDetector():
@@ -40,7 +40,7 @@ class GestureDetector():
         self.transform_listener = TransformListener()
         self.tfs = []
 
-        self.joints = ["head", "neck", "torso", "waist", "left_collar",
+        self.all_joints = ["head", "neck", "torso", "waist", "left_collar",
                        "left_shoulder", "left_elbow", "left_wrist",
                        "left_hand", "right_collar", "right_shoulder",
                        "right_elbow", "right_wrist", "right_hand",
@@ -127,6 +127,15 @@ class GestureDetector():
         angle = calculate_degrees(*rotations)
         return angle
 
+    def _get_average(self) -> list:
+        """
+        Calculates the average of all joints. Returns average translation"""
+
+        transformations = self._lookup_joints(self.all_joints)
+        average = translation_average(transformations)
+
+        return average
+
     def _get_joints(self, joints) -> None:
         """
         Pretty prints the joints in list.
@@ -158,7 +167,7 @@ class GestureDetector():
 
         self.time = time.asctime(time.localtime(time.time()))
 
-        # all_joints = self._lookup_joints(self.joints)
+        # all_joints = self._lookup_joints(self.all_joints)
         # print(all_joints)
         print(self._get_angle(["left_wrist", "left_elbow", "left_shoulder"]))
         # self._get_joints(["torso"])
