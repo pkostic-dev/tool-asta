@@ -10,7 +10,7 @@ import rospy
 import tf
 
 from save_manager import SaveManager
-from helper import calculate_degrees
+from helper import calculate_degrees, print_green, print_red
 
 
 def get_key(key_timeout):
@@ -160,7 +160,7 @@ class GestureCreator():
         print("Saving joints", joints)
         transformations = self._lookup_joints(joints)
         if not transformations:
-            print("Couldn't look up joints.")
+            print_red("Couldn't look up joints.")
             return
         print("Enter the file name : ", end="")
         file_name = input()
