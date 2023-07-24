@@ -7,7 +7,7 @@ import numpy as np
 
 from tf import TransformBroadcaster, transformations
 from PyNuitrack import py_nuitrack # type: ignore
-
+from helper import check_similar_array
 
 class SkeletonConverter():
     """Converts Nuitrack skeleton data into TF data and publishes it.
@@ -180,7 +180,7 @@ class SkeletonConverter():
                 # Currently confidence is either 0.0 or 0.75
                 
                 confidence = self.confidence[id_index][joint]
-                similar = self._check_similar_array(
+                similar = check_similar_array(
                     translation,
                     last_translation)
                 
@@ -199,16 +199,6 @@ class SkeletonConverter():
                     )
                     self.last_translation[id_index, joint, :] = translation
             print(msg)
-    def _check_similar_array(self, array1:np.ndarray, array2:np.ndarray,
-                             _decimals:int=5):
-        """
-        Checks if two ndarrays have similar values up to the nth digit after the decimal point.
-        """
-
-        rounded_array1 = np.round(array1, decimals=_decimals)
-        rounded_array2 = np.round(array2, decimals=_decimals)
-
-        return np.array_equal(rounded_array1, rounded_array2)
 
     def _broadcast_nuitrack_frame(self) -> None:
         """Broadcasts the camera location tf."""
