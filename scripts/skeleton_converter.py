@@ -4,18 +4,19 @@ from math import radians
 
 import rospy
 import numpy as np
-from tf import TransformBroadcaster
-from tf import transformations
-from PyNuitrack import py_nuitrack
 
+from tf import TransformBroadcaster, transformations
+from PyNuitrack import py_nuitrack # type: ignore
+from helper import check_similar_array
 
-class SkeletonConverter:
+class SkeletonConverter():
     """Converts Nuitrack skeleton data into TF data and publishes it.
 
     This class initialises a Nuitrack object. Converts the data obtained from
     it into TF skeleton data. And publishes the TF skeleton data to ROS with a
     TransformBroadcaster object. This class is a mix of an Adapter pattern
-    class and a publisher class.
+    class and a publisher class. It doesn't publish joints with less than 0.5
+    confidence and it doesn't publish the same joint data twice.
     """
 
     def __init__(self) -> None:
@@ -29,6 +30,8 @@ class SkeletonConverter:
         rospy.init_node("tf_skeletons", anonymous=True)
         self.nb_joints = 20
         self.max_ids = 10
+        self.camera_frame = "nuitrack_frame" # NOTE : camera location tf
+        self.root_frame = "map" # NOTE : root frame, might have to change it
         self.translation_scale = 1000.0
         update_frequency = 10.0  # NOTE : in Hz
         self.rospy_rate = rospy.Rate(update_frequency)
@@ -44,6 +47,8 @@ class SkeletonConverter:
         self.rotation = np.zeros([self.max_ids, self.nb_joints, 9])
         # The confidence of every joint (0.0 to 1.0 theoretically)
         self.confidence = np.zeros([self.max_ids, self.nb_joints])
+        # The previously sent translations of every joint in space
+        self.last_translation = np.zeros([self.max_ids, self.nb_joints, 3])
 
         self._init_nuitrack()
 
@@ -145,9 +150,10 @@ class SkeletonConverter:
             id_index = self.ids.index(id)
 
             # Broadcast /nuitrack_frame position and rotation (camera)
-            self._broadcast_nuitrack_frame()       
+            self._broadcast_nuitrack_frame()
 
             # Broadcast transform message for each joint
+            msg = str(rospy.Time.now()) + " "
             for joint in range(self.nb_joints):
                 # Rotation to euler
                 rotations = self.rotation[id_index, joint, :]
@@ -158,8 +164,10 @@ class SkeletonConverter:
                         [rotations[6], rotations[7], rotations[8]],
                     ]
                 )
-                euler_rotation = transformations.euler_from_matrix(matrix, "rxyz")
+                euler_rotation = transformations.euler_from_matrix(
+                    matrix, "rxyz")
 
+                last_translation = self.last_translation[id_index, joint, :]
                 translation = self.translation[id_index, joint, :]
                 rotation = transformations.quaternion_from_euler(
                     *euler_rotation
@@ -168,32 +176,39 @@ class SkeletonConverter:
                 joint_name = str(self.joints[id_index][joint].type)
                 child = joint_name + "_" + str(id_index)
                 parent = "/nuitrack_frame"
-                confidence = self.confidence[id_index][joint]
 
                 # Currently confidence is either 0.0 or 0.75
-                # NOTE : confidence is not enough to get rid of invalid
-                #        points (invisible people)
-                if confidence > 0.5:
-                    msg = "[{time}] {child}({conf}) = \n\t{t}\n\t{r}"
-                    print(msg.format(
-                        time=time,
-                        child=child,
-                        conf=confidence,
-                        t=translation,
-                        r=rotation
-                        ))
+                
+                confidence = self.confidence[id_index][joint]
+                similar = check_similar_array(
+                    translation,
+                    last_translation)
+                
+                # NOTE : Confidence is not enough to get rid of invalid
+                #        points (static invisible people), so we check
+                #        for very similar translations and don't publish
+                #        them.
+                if ((confidence > 0.5) and not similar):
+                    # msg = "[{time}] {child}({conf}) = {tsl} {rot}"
+
+                    # print(msg.format(time=time, child=child, conf=confidence,
+                    #     tsl=translation, rot=rotation))
+                    msg += child + ", "
                     self.transform_broadcaster.sendTransform(
                         translation, rotation, time, child, parent
                     )
+                    self.last_translation[id_index, joint, :] = translation
+            print(msg)
 
     def _broadcast_nuitrack_frame(self) -> None:
         """Broadcasts the camera location tf."""
 
         # Translation
+        # NOTE : unit might be in meters
         x = 0
         y = 0
         z = 1
-        translation = (x, y, z)  # NOTE : unit might be in meters
+        translation = (x, y, z)
 
         # Rotation
         # Euler angles in degrees
@@ -211,11 +226,9 @@ class SkeletonConverter:
             roll_rad, pitch_rad, yaw_rad, axes="sxyz"
         )
 
-        child = "nuitrack_frame"  # NOTE : camera location tf
-        parent = "map"  # NOTE : root frame, might have to change it
-
         self.transform_broadcaster.sendTransform(
-            translation, rotation, rospy.Time.now(), child, parent
+            translation, rotation, rospy.Time.now(),
+            self.camera_frame, self.root_frame
         )
 
     def launch(self) -> None:

@@ -163,8 +163,7 @@ catkin_install_python(
   PROGRAMS
   scripts/skeleton_converter.py
   scripts/python_version.py
-  scripts/test_convert.py
-  scripts/test_rospy.py
+  scripts/detect_gestures.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
