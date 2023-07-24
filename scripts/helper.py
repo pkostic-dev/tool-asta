@@ -6,6 +6,10 @@ import numpy as np
 
 from tf import transformations
 
+"""
+Contains shared functions that are used across other scripts, providing utility
+functions and common functionalities.
+"""
 
 def calculate_degrees(pointA, vertex, pointB) -> float:
     """
@@ -57,6 +61,7 @@ def calculate_distances(p1_x:float, p1_y:float,
     
     return (distance_x, distance_y, distance)
 
+
 def is_point_inside_circle(center_x:float, center_y:float, rad:float,
                            point_x:float, point_y:float) -> bool:
     """
@@ -67,3 +72,41 @@ def is_point_inside_circle(center_x:float, center_y:float, rad:float,
     (_, _, distance) = calculate_distances(center_x, center_y ,point_x, point_y)
 
     return distance <= rad
+
+
+def translation_average(joints:dict) -> list:
+    nb_joints = len(joints)
+    if not nb_joints:
+        return [0.0, 0.0, 0.0]
+
+    total = [0.0, 0.0, 0.0]
+    
+    for joint in joints.values():
+        translation = joint[0]
+        total[0] += translation[0]
+        total[1] += translation[1]
+        total[2] += translation[2]
+
+    average = [value / nb_joints for value in total]
+
+    return average
+
+
+def check_similar_array(array1:np.ndarray, array2:np.ndarray,
+                             _decimals:int=5):
+        """
+        Checks if two ndarrays have similar values up to the nth digit after the decimal point.
+        """
+
+        rounded_array1 = np.round(array1, decimals=_decimals)
+        rounded_array2 = np.round(array2, decimals=_decimals)
+
+        return np.array_equal(rounded_array1, rounded_array2)
+
+
+def print_red(msg:str) -> None:
+    print("\033[91m {}\033[00m".format(msg))
+
+
+def print_green(msg:str) -> None:
+    print("\033[92m {}\033[00m".format(msg))
