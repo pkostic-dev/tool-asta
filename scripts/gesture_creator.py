@@ -12,8 +12,9 @@ import tf
 from save_manager import SaveManager
 from helper import calculate_degrees, print_green, print_red
 
+DEBUG = False
 
-def get_key(key_timeout):
+def get_key(key_timeout:float) -> str:
     """
     Check for key presses during a timeout period.
     """
@@ -41,84 +42,218 @@ class GestureCreator():
     def __init__(self) -> None:
         super().__init__()
 
+        # SAVING
         self.save_manager = SaveManager()
+        self.formats = ["json", "csv", "pkl"]
+        self.format = 0
+
+        # ROS
         rospy.init_node("gesture_creator", anonymous=True)
         # self.root_frame is set to the default root frame in ROS : "map"
         self.root_frame = "map"
         hz_rate = 10.0
         self.rospy_rate = rospy.Rate(hz_rate)
         self.transform_listener = tf.TransformListener()
+
+        # JOINTS
         self.all_joints = [ "head", "neck", "torso", "waist", "left_collar",
                             "left_shoulder", "left_elbow", "left_wrist",
                             "left_hand", "right_collar", "right_shoulder",
                             "right_elbow", "right_wrist", "right_hand",
                             "left_hip", "left_knee", "left_ankle",
                             "right_hip", "right_knee", "right_ankle"]
-        self.formats = ["json", "csv", "pickle"]
-        self.format = 0
-
         self.joints = ["torso", "head"] # used for saving joints
         l_elbow_angle = ["left_shoulder", "left_elbow", "left_wrist"]
         r_elbow_angle = ["right_shoulder", "right_elbow", "right_wrist"]
         self.joint_angles = [l_elbow_angle, r_elbow_angle] # for saving angles
         
-        self.commands = {"s": "Save joints", "a": "Save angles", 
-                         "l": "Load file", "c": "Change format", "e": "Exit"}
-        self._print_commands()
+        # INTERFACE
+        self.key_timeout = 0.1
+        self.interface_commands = {
+            "save_joints": {
+                "keys" : ["s", "S"],
+                "name" : "Save joints",
+                "action" : self.action_save_joints
+            },
+            "save_angles": {
+                "keys" : ["a", "A"],
+                "name" : "Save angles",
+                "action" : self.action_save_angles
+            },
+            "load_file": {
+                "keys" : ["l", "L"],
+                "name" : "Load file",
+                "action" : self.action_load
+            },
+            "change_format": {
+                "keys" : ["c", "C"],
+                "name" : "Change format",
+                "action" : self.action_change_format
+            },
+            "exit": {
+                "keys" : ["e", "E", "q", "Q"],
+                "name" : "Exit",
+                "action" : self.action_exit
+            }
+        }
+        self.save_commands = {
+            "snapshot": {
+                "keys" : ["s", "S"],
+                "name" : "Snapshot now",
+                "action" : self.action_snapshot_save
+            },
+            "timer": {
+                "keys" : ["t", "T"],
+                "name" : "Timer set",
+                "action" : self.action_timer_save
+            },
+            "cancel": {
+                "keys" : ["c", "C", "e", "E", "q", "Q"],
+                "name" : "Cancel",
+                "action" : self.action_cancel
+            }
+        }
+        self.current_commands = self.interface_commands
+
+        self.print_format()
+        self.print_lists()
+        self.print_commands(self.current_commands)
     
-    def _print_commands(self):
-        print()
-        print("Saving/Loading format :", self.formats[self.format])
+    def print_format(self) -> None:
+        print("Saving/Loading format is set to *.", self.formats[self.format])
+
+    def print_lists(self) -> None:
         print("Joints list :", self.joints)
         print("Angles list :", self.joint_angles)
+
+    def print_commands(self, commands:dict) -> None:
+        if not commands:
+            print("No commands available.")
+            return
         print("Commands : ")
         msg = ""
-        for key in self.commands:
-            command = self.commands[key]
-            msg += "[{key}] {command}".format(key=key, command=command)
-            msg += "    "
+        for command in commands:
+            name = commands[command]["name"]
+            key = commands[command]["keys"][0]
+            msg += "[{key}] {name}    ".format(key=key, name=name)
         print(msg)
 
-    def _update(self) -> None:
-        """
-        Update loop. Checks for key presses.
-        """
-
-        key = get_key(0.1)
-        if (len(key)):
-            print("Pressed [", key, "]", sep="")
-            self._keyboard_callback(key)
-        self.rospy_rate.sleep()
-
-    def _keyboard_callback(self, key) -> None:
+    def keyboard_callback(self, key:str) -> None:
         """
         Execute functions based on key pressed.
         """
-        # FIXME: couple with self.commands
-        if key == 's' or key == 'S':
-            self._save_joints(self.joints)
+        if DEBUG:
+            print("Pressed [", key, "]", sep="")
+        for command in self.current_commands:
+            command_keys = self.current_commands[command]["keys"]
+            if key in command_keys:
+                action = self.current_commands[command]["action"]
+                action()
+                self.print_commands(self.current_commands)
+                break
 
-        if key == 'a' or key == 'A':
-            self._save_angles(self.joint_angles)
+    def action_save_joints(self) -> None:
+        self.current_commands = self.save_commands
+        self.target = "joints"
 
-        if key == 'l' or key == 'L':
-            self._load()
+    def action_save_angles(self) -> None:
+        self.current_commands = self.save_commands
+        self.target = "angles"
 
-        if key == 'c' or key == 'C':
-            self._change_format()
+    def action_load(self) -> None:
+        """
+        Load sequence triggered by pressing 'l'.
+        """
 
-        if key == 'e' or key == 'E':
-            self._exit()
+        print("Enter the file name : ", end='')
+        file_name = input()
+        print("Loading", file_name)
+        data = self.load_file(file_name)
+        if data:
+            print(data)
+    
+    def action_change_format(self) -> None:
+        if self.format + 1 <= len(self.formats) - 1:
+            self.format += 1
+        else:
+            self.format = 0
+        self.print_format()
+    
+    def action_exit(self) -> None:
+        """
+        SystemExit triggered by pressing 'e'.
+        """
+
+        print("Exiting...")
+        raise SystemExit
+
+    def action_snapshot_save(self) -> None:
+        """
+        Snapshot saving sequence triggered by pressing 's'.
+        """
+        data = {}
+        if self.target == "joints":
+            joints = self.joints
+            print("Saving joints", joints)
+            transformations = self.lookup_joints(joints)
+            if not transformations:
+                print_red("Couldn't look up joints.")
+                return
+            data = transformations
+
+        if self.target == "angles":
+            angles = self.joint_angles
+            print("Saving angles", angles)
+            calculated_angles = {}
+            for joint_angle in angles:
+                vertex = joint_angle[1]
+                calculated_angles[vertex] = self.get_angle(joint_angle)
+            data = calculated_angles
+
+        print("Enter the file name : ", end="")
+        file_name = input()
+        print("Saving to", file_name)
+        self.save_file(data, file_name)
+
+    def action_timer_save(self) -> None:
+        print("Enter timer duration : ", end="")
+        duration = int(input())
+        while duration > 0:
+            print(str(duration) + "sec left")
+            rospy.sleep(1)
+            duration -= 1
+        print("Cheese")
+        self.action_snapshot_save()
+
+    def action_cancel(self) -> None:
+        self.current_commands = self.interface_commands
+
+    def get_angle(self, joints:list) -> dict:
+        """
+        Calculates the angle of the joints in list. Returns a dictionary
+        that contains joint keys, list of joints, and angle in degrees. 
+        """
         
-        self._print_commands()
+        result = {}
+        transformations = self.lookup_joints(joints)
+        result["joint_keys"] = list(transformations.keys())
+        result["joints"] = transformations
+        rotations = []
+        for _, value in transformations.items():
+            rotation = value[1]
+            rotations.append(rotation)
+        degrees = calculate_degrees(*rotations)
+        result["degrees"] = degrees
 
-    def _lookup_joints(self, joints, ids=[0]) -> dict:
+        return result
+
+    def lookup_joints(self, joints:list, ids=[0]) -> dict:
         """
         Looks up the joints in the list and returns a dictionary with
         each joint as key and the translation and rotation arrays as values.
         """
 
-        result = dict()
+        result = {}
         try:
             for id in ids:
                 for joint in joints:
@@ -133,104 +268,29 @@ class GestureCreator():
 
         return result
 
-    def _get_angle(self, joints) -> dict:
-        """
-        Calculates the angle of the joints in list. Returns a dictionary
-        that contains joint keys, list of joints, and angle in degrees. 
-        """
-        
-        result = {}
-        transformations = self._lookup_joints(joints)
-        result["joint_keys"] = list(transformations.keys())
-        result["joints"] = transformations
-        rotations = []
-        for _, value in transformations.items():
-            rotation = value[1]
-            rotations.append(rotation)
-        degrees = calculate_degrees(*rotations)
-        result["degrees"] = degrees
-
-        return result
-
-    def _save_joints(self, joints) -> None:
-        """
-        Joint saving sequence triggered by pressing 's'.
-        """
-
-        print("Saving joints", joints)
-        transformations = self._lookup_joints(joints)
-        if not transformations:
-            print_red("Couldn't look up joints.")
-            return
-        print("Enter the file name : ", end="")
-        file_name = input()
-        print("Saving to", file_name)
+    def save_file(self, data:dict, file_name:str) -> None:
         if self.formats[self.format] == "json":
-            self.save_manager.save_dict_to_json(transformations, file_name)
+            self.save_manager.save_dict_to_json(data, file_name)
         elif self.formats[self.format] == "csv":
-            self.save_manager.save_dict_to_csv(transformations, file_name)
-        elif self.formats[self.format] == "pickle":
-            self.save_manager.save_dict_to_pickle(transformations, file_name)
+            self.save_manager.save_dict_to_csv(data, file_name)
+        elif self.formats[self.format] == "pkl":
+            self.save_manager.save_dict_to_pickle(data, file_name)
         else:
-            self.save_manager.save_any(transformations, file_name)
+            self.save_manager.save_any(data, file_name)
 
-    def _save_angles(self, angles) -> None:
+    def load_file(self, file_name:str) -> dict:
+        data = self.save_manager.load_any(file_name)
+        return data
+
+    def update(self) -> None:
         """
-        Angle saving sequence triggered by pressing 'a'.
-        """
-
-        print("Saving angles", angles)
-
-        calculated_angles = {}
-        for joint_angle in angles:
-            vertex = joint_angle[1]
-            calculated_angles[vertex] = self._get_angle(joint_angle)
-
-        print("Enter the file name : ", end="")
-        file_name = input()
-        print("Saving to", file_name)
-        if self.formats[self.format] == "json":
-            self.save_manager.save_dict_to_json(calculated_angles, file_name)
-        elif self.formats[self.format] == "csv":
-            self.save_manager.save_dict_to_csv(calculated_angles, file_name)
-        elif self.formats[self.format] == "pickle":
-            self.save_manager.save_dict_to_pickle(calculated_angles, file_name)
-        else:
-            self.save_manager.save_any(calculated_angles, file_name)
-
-    def _load(self) -> None:
-        """
-        Load sequence triggered by pressing 'l'.
+        Update loop. Checks for key presses.
         """
 
-        print("Enter the file name : ", end='')
-        file_name = input()
-        print("Loading", file_name)
-        data = {}
-        if self.formats[self.format] == "json":
-            data = self.save_manager.load_json_to_dict(file_name)
-        elif self.formats[self.format] == "csv":
-            data = self.save_manager.load_csv_to_dict(file_name)
-        elif self.formats[self.format] == "pickle":
-            data = self.save_manager.load_pickle_to_dict(file_name)
-        else:
-            data = self.save_manager.load_any(file_name)
-        if data:
-            print(data)
-    
-    def _change_format(self) -> None:
-        if self.format + 1 <= len(self.formats) - 1:
-            self.format += 1
-        else:
-            self.format = 0
-    
-    def _exit(self) -> None:
-        """
-        SystemExit triggered by pressing 'e'.
-        """
-
-        print("Exiting...")
-        raise SystemExit
+        key = get_key(self.key_timeout)
+        if len(key):
+            self.keyboard_callback(key)
+        self.rospy_rate.sleep()
 
     def launch(self) -> None:
         """
@@ -239,7 +299,7 @@ class GestureCreator():
 
         while not rospy.is_shutdown():
             try:
-                self._update()
+                self.update()
             except KeyboardInterrupt:
                 rospy.signal_shutdown("KeyboardInterrupt")
                 raise SystemExit
