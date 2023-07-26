@@ -8,6 +8,10 @@ from datetime import datetime
 
 from helper import print_green, print_red
 
+class FileExtensionException(Exception):
+    "Raised when the file doesn't have a valid extension"
+    pass
+
 class SaveManager():
     """Allows for saving and loading joints in multiple different formats.
 
@@ -33,7 +37,9 @@ class SaveManager():
             return self.load_json_to_dict(file_name)
         if extension == "csv":
             return self.load_csv_to_dict(file_name)
-        self.file_not_found(file_name)
+        valid_extensions = ["json", "csv", "pkl"]
+        if not extension in valid_extensions:
+            print_red("Invalid extension, valid extensions: json, csv, pkl.")
         return {}
 
     def check_extension(self, file_name: str, extension: str) -> str:
