@@ -5,7 +5,7 @@ import pprint
 
 import rospy
 
-from tf import TransformListener, LookupException, ConnectivityException, ExtrapolationException # type: ignore
+import tf
 from std_msgs.msg import String
 from save_manager import SaveManager
 from helper import calculate_degrees, calculate_distances, is_point_inside_circle, translation_average, print_red, print_green
@@ -37,7 +37,7 @@ class GestureDetector():
         self.gesture_publisher = rospy.Publisher(
             'gesture', String, queue_size=1
             )
-        self.transform_listener = TransformListener()
+        self.transform_listener = tf.TransformListener()
         self.tfs = []
 
         self.all_joints = ["head", "neck", "torso", "waist", "left_collar",
@@ -104,14 +104,19 @@ class GestureDetector():
         each joint as key and the translation and rotation arrays as values.
         """
 
-        result = dict()
-        for id in ids:
-            for joint in joints:
-                joint_name = joint + "_" + str(id)
-                (tslt, rttn) = self.transform_listener.lookupTransform(
-                    joint_name, self.root_frame, rospy.Time(0))
-                result[joint] = [tslt, rttn]
-        
+        result = {}
+        try:
+            for id in ids:
+                for joint in joints:
+                    joint_name = joint + "_" + str(id)
+                    (tslt, rttn) = self.transform_listener.lookupTransform(
+                        joint_name, self.root_frame, rospy.Time(0))
+                    result[joint] = [tslt, rttn]
+        except (tf.LookupException,
+                tf.ConnectivityException,
+                tf.ExtrapolationException) as exception:
+                print(exception)
+
         return result
     
     def _get_angle(self, joints) -> float:
