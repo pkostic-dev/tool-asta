@@ -105,8 +105,8 @@ def check_similar_array(array1:np.ndarray, array2:np.ndarray,
 
 
 def print_red(msg:str) -> None:
-    print("\033[91m {}\033[00m".format(msg))
+    print("\033[91m{}\033[00m".format(msg))
 
 
 def print_green(msg:str) -> None:
-    print("\033[92m {}\033[00m".format(msg))
+    print("\033[92m{}\033[00m".format(msg))
