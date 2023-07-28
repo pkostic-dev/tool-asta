@@ -11,6 +11,7 @@ import tf
 
 from save_manager import SaveManager
 from helper import calculate_degrees, print_green, print_red
+import joints
 
 DEBUG = False
 
@@ -56,17 +57,14 @@ class GestureCreator():
         self.transform_listener = tf.TransformListener()
 
         # JOINTS
-        self.all_joints = [ "head", "neck", "torso", "waist", "left_collar",
-                            "left_shoulder", "left_elbow", "left_wrist",
-                            "left_hand", "right_collar", "right_shoulder",
-                            "right_elbow", "right_wrist", "right_hand",
-                            "left_hip", "left_knee", "left_ankle",
-                            "right_hip", "right_knee", "right_ankle"]
         self.joints = ["torso", "head"] # used for saving joints
-        l_elbow_angle = ["left_shoulder", "left_elbow", "left_wrist"]
-        r_elbow_angle = ["right_shoulder", "right_elbow", "right_wrist"]
-        self.joint_angles = [l_elbow_angle, r_elbow_angle] # for saving angles
-        
+        l_elbow_angle = joints.angles["l_elbow"]
+        r_elbow_angle = joints.angles["r_elbow"]
+        l_shoulder_angle = joints.angles["l_shoulder"]
+        r_shoulder_angle = joints.angles["r_shoulder"]
+        self.joint_angles = [l_elbow_angle, r_elbow_angle,
+                             l_shoulder_angle, r_shoulder_angle]
+
         # INTERFACE
         self.key_timeout = 0.1
         self.interface_commands = {
