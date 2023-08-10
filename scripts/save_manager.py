@@ -153,13 +153,10 @@ class SaveManager():
             self.file_not_found(file_name)
             return {}
 
-
-if __name__ == "__main__":
-    SM = SaveManager()
-
+def test() -> None:
     print("Test module ? (y/n) ", end="")
-    test = input()
-    if test == "y" or test == "Y":
+    is_test = input()
+    if is_test == "y" or is_test == "Y":
         joints = {"test_joint": [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4]]}
         angles = {
             "vertex" : {
@@ -199,3 +196,9 @@ if __name__ == "__main__":
         assert (SM.load_csv_to_dict("angles") == angles)
 
         print_green("All tests passed.")
+
+
+if __name__ == "__main__":
+    SM = SaveManager()
+
+    test()
