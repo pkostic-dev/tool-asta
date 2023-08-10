@@ -24,11 +24,7 @@ class GestureDetector():
         self.save_manager = SaveManager()
 
         # Publisher of human gestures
-        self.human_gesture_publisher = rospy.Publisher(
-            'human_gesture',
-            String,
-            queue_size=1
-        )
+        self.human_gesture_publisher = rospy.Publisher('human_gesture', String, queue_size=1)
 
         self.root_frame = "map" # NOTE : root frame, might have to change it
         update_frequency = 10.0  # NOTE : in Hz
