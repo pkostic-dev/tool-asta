@@ -9,6 +9,9 @@ from tf import TransformBroadcaster, transformations
 from PyNuitrack import py_nuitrack # type: ignore
 from helper import check_similar_array
 
+# Robotact spectacle
+from std_msgs.msg import String
+
 class SkeletonConverter():
     """Converts Nuitrack skeleton data into TF data and publishes it.
 
@@ -49,6 +52,13 @@ class SkeletonConverter():
         self.confidence = np.zeros([self.max_ids, self.nb_joints])
         # The previously sent translations of every joint in space
         self.last_translation = np.zeros([self.max_ids, self.nb_joints, 3])
+
+        # Robotact Spectacle
+        self.human_position_publisher = rospy.Publisher(
+            'human_position',
+            String,
+            queue_size=1
+        )
 
         self._init_nuitrack()
 
@@ -198,7 +208,40 @@ class SkeletonConverter():
                         translation, rotation, time, child, parent
                     )
                     self.last_translation[id_index, joint, :] = translation
-            print(msg)
+
+                    # Robotact Spectacle
+                    self._publish_human_position(joint_name, translation)
+            #print(msg)
+
+    def _publish_human_position(self, joint_name, translation):
+        if joint_name == "torso":
+            _x = translation[0]
+            _z = translation[2]
+
+            side = "" # g:Jardin, d:Cour
+            depth = ""
+            _msg = ""
+
+            left_margin = 0.1
+            right_margin = 0.1
+
+            distance_2m = 2.5
+            distance_1m = 1.0
+
+            if (_x < -left_margin):
+                side = "cour"
+            elif (_x > right_margin):
+                side = "jardin"
+            
+            if (_z < -distance_2m):
+                depth += "2m"
+            elif (_z < -distance_1m):
+                depth += "1m"
+
+            _msg = side + "_" + depth
+            if len(_msg) > 1:
+                self.human_position_publisher.publish(_msg)
+                print("x:", _x, "z:", _z, "[p : ", _msg, "]")
 
     def _broadcast_nuitrack_frame(self) -> None:
         """Broadcasts the camera location tf."""
