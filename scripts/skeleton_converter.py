@@ -210,7 +210,10 @@ class SkeletonConverter():
                     self.last_translation[id_index, joint, :] = translation
 
                     # Robotact Spectacle
-                    self._publish_human_position(joint_name, translation)
+                    #self._publish_human_position(joint_name, translation)
+
+                    # Jeu trésor
+                    self._publish_tiles(joint_name, translation)
             #print(msg)
 
     def _publish_human_position(self, joint_name, translation):
@@ -239,6 +242,55 @@ class SkeletonConverter():
                 depth += "1m"
 
             _msg = side + "_" + depth
+            if len(_msg) > 1:
+                self.human_position_publisher.publish(_msg)
+                print("x:", _x, "z:", _z, "[p : ", _msg, "]")
+
+    def _publish_tiles(self, joint_name, translation):
+        if joint_name == "torso":
+            _x = translation[0]
+            _z = translation[2]
+
+            GRID = [
+                ["tile_1", "tile_2", "tile_3"],
+                ["tile_4", "tile_5", "tile_6"],
+                ["tile_7", "tile_8", "tile_9"]
+            ]
+
+            LEFT = 0
+            CENTER = 1
+            RIGHT = 2
+            
+            ONE_METER = 0
+            TWO_METERS = 1
+            THREE_METERS = 2
+
+            TILE_WIDTH = 1.0
+
+            side = -1
+            depth = -1
+            _msg = ""
+
+            distance_3m = 3.0
+            distance_2m = 2.0
+            distance_1m = 1.0
+
+            if (_x < -TILE_WIDTH/2):
+                side = RIGHT
+            elif (_x > TILE_WIDTH/2):
+                side = LEFT
+            else:
+                side = CENTER
+            
+            if (_z < -distance_3m):
+                depth = THREE_METERS
+            elif (_z < -distance_2m):
+                depth = TWO_METERS
+            else:
+                depth = ONE_METER
+
+
+            _msg = GRID[depth, side]
             if len(_msg) > 1:
                 self.human_position_publisher.publish(_msg)
                 print("x:", _x, "z:", _z, "[p : ", _msg, "]")
