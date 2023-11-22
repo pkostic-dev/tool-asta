@@ -55,7 +55,7 @@ class SkeletonConverter():
 
         # Robotact Spectacle
         self.human_position_publisher = rospy.Publisher(
-            'human_position',
+            '/human_position',
             String,
             queue_size=1
         )
@@ -210,10 +210,10 @@ class SkeletonConverter():
                     self.last_translation[id_index, joint, :] = translation
 
                     # Robotact Spectacle
-                    #self._publish_human_position(joint_name, translation)
+                    self._publish_human_position(joint_name, translation)
 
                     # Jeu trésor
-                    self._publish_tiles(joint_name, translation)
+                    #self._publish_tiles(joint_name, translation)
             #print(msg)
 
     def _publish_human_position(self, joint_name, translation):
